@@ -1,0 +1,19 @@
+[project]
+name = "fugle-lyder"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pandas",
+    "tqdm",
+    "pygwalker",
+    "streamlit",
+    "requests",
+    "pydub",
+    "tensorflow",
+    "ffmpeg",
+    "birdnetlib",
+    "pyaudio",
+    "librosa",
+]
