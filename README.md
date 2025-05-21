@@ -52,7 +52,7 @@ If you're starting with a fresh Windows installation, follow these steps to set 
 7. **Ensure FFmpeg is available**:
    - Download FFmpeg for Windows from [ffmpeg.org](https://ffmpeg.org/download.html#build-windows) or [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) (download a "release build")
    - Extract the ZIP file
-   - Copy `ffmpeg.exe` and `ffprobe.exe` from the extracted FFmpeg's `bin` folder to your `ffmpeg_win_bin` folder if on windows or `ffmpeg_macos_bin` on mac
+   - Copy `ffmpeg.exe` and `ffprobe.exe` from the extracted FFmpeg's `bin` folder to your `ffmpeg_win_bin` folder
 
 ### Running the Program (Each Time You Want to Use It)
 
