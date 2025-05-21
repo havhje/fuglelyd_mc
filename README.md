@@ -1,4 +1,5 @@
 # Bird Species Detection and Analysis Tool
+Created by: Håvard Hjermstad-Sollerud
 
 This tool analyzes audio recordings to detect bird species using BirdNET, enriches detections with taxonomic information from Artskart (Norwegian Biodiversity Information Centre API), and can split audio files into smaller clips based on the detections.
 
