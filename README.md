@@ -223,30 +223,30 @@ For the best results, you should use the accurate latitude and longitude for the
 
 ### Examples
 
-Let's assume your audio files are in a folder `D:\FieldRecordings\June2024` and you want the output to go into `D:\BirdAnalysis_Results`. The recordings were made near Bergen, Norway (approx. Lat: 60.39, Lon: 5.32) on June 15th, 2024.
+Let's assume your audio files are in a folder `C:\FieldRecordings\June2024` and you want the output to go into `C:\BirdAnalysis_Results`. The recordings were made near Bergen, Norway (approx. Lat: 60.39, Lon: 5.32) on June 15th, 2024.
 
 1.  **Basic analysis with default settings:**
     ```cmd
-    python analyser_lyd_main.py --input_dir "D:\FieldRecordings\June2024" --output_dir "D:\BirdAnalysis_Results" --lat 60.39 --lon 5.32 --date 2024-06-15
+    python analyser_lyd_main.py --input_dir "C:\FieldRecordings\June2024" --output_dir "C:\BirdAnalysis_Results" --lat 60.39 --lon 5.32 --date 2024-06-15
     ```
     *This will use a minimum confidence of 0.5 and save up to 10 audio clips per species.*
 
 2.  **Analysis with a higher confidence threshold and fewer clips per species:**
     You only want very confident detections and don't need many example clips.
     ```cmd
-    python analyser_lyd_main.py --input_dir "D:\FieldRecordings\June2024" --output_dir "D:\BirdAnalysis_Results" --lat 60.39 --lon 5.32 --date 2024-06-15 --min_conf 0.75 --max_segments 3
+    python analyser_lyd_main.py --input_dir "C:\FieldRecordings\June2024" --output_dir "C:\BirdAnalysis_Results" --lat 60.39 --lon 5.32 --date 2024-06-15 --min_conf 0.75 --max_segments 3
     ```
 
 3.  **Analysis to get all possible detections (low confidence) and no audio splitting:**
     You want to see everything BirdNET might have found, even weak signals, and you only need the CSV data.
     ```cmd
-    python analyser_lyd_main.py --input_dir "D:\FieldRecordings\June2024" --output_dir "D:\BirdAnalysis_Results" --lat 60.39 --lon 5.32 --date 2024-06-15 --min_conf 0.1 --no_split
+    python analyser_lyd_main.py --input_dir "C:\FieldRecordings\June2024" --output_dir "C:\BirdAnalysis_Results" --lat 60.39 --lon 5.32 --date 2024-06-15 --min_conf 0.1 --no_split
     ```
 
 4.  **Analysis with detailed logging for troubleshooting:**
     If something isn't working as expected, `DEBUG` level logging can provide more insight.
     ```cmd
-    python analyser_lyd_main.py --input_dir "D:\FieldRecordings\June2024" --output_dir "D:\BirdAnalysis_Results" --lat 60.39 --lon 5.32 --date 2024-06-15 --log_level DEBUG
+    python analyser_lyd_main.py --input_dir "C:\FieldRecordings\June2024" --output_dir "C:\BirdAnalysis_Results" --lat 60.39 --lon 5.32 --date 2024-06-15 --log_level DEBUG
     ```
 
 5.  **Analyzing recordings from a different location and date (e.g., a forest in Eastern Norway):**
