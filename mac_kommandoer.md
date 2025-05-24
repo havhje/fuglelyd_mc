@@ -9,30 +9,17 @@
 ### Examples
 
 The input and output directories are `data_input_lyd` and `data_output_lyd` respectively, located within your project folder.
-
-1.  **Basic analysis using script defaults for location and date:**
-    This will use `lat=68.5968`, `lon=15.4244`, and the current date.
+1.  **Analysis with a specific location and date, higher confidence, fewer clips:**
     ```bash
-    uv run -- python analyser_lyd_main.py --input_dir "data_input_lyd" --output_dir "data_output_lyd"
+    uv run -- python analyser_lyd_main.py --input_dir "data_input_lyd" --output_dir "data_output_lyd" --lat 59.91 --lon 10.75 --date 2024-07-10 --min_conf 0.5 --max_segments 5
     ```
 
-2.  **Analysis specifying a date, using default location:**
-    Uses `lat=68.5968`, `lon=15.4244`, and date `2024-05-20`.
-    ```bash
-    uv run -- python analyser_lyd_main.py --input_dir "data_input_lyd" --output_dir "data_output_lyd" --date 2024-05-20
-    ```
-
-3.  **Analysis with a specific location and date, higher confidence, fewer clips:**
-    ```bash
-    uv run -- python analyser_lyd_main.py --input_dir "data_input_lyd" --output_dir "data_output_lyd" --lat 59.91 --lon 10.75 --date 2024-07-10 --min_conf 0.75 --max_segments 3
-    ```
-
-4.  **Analysis using default location, specific date, low confidence, no audio splitting:**
+2.  **Analysis using default location, specific date, low confidence, no audio splitting:**
     ```bash
     uv run -- python analyser_lyd_main.py --input_dir "data_input_lyd" --output_dir "data_output_lyd" --date 2024-05-20 --min_conf 0.1 --no_split
     ```
 
-5.  **Analysis with detailed logging (uses default location and current date if not specified):**
+3.  **Analysis with detailed logging (uses default location and current date if not specified):**
     ```bash
     uv run -- python analyser_lyd_main.py --input_dir "data_input_lyd" --output_dir "data_output_lyd" --log_level DEBUG
     ```

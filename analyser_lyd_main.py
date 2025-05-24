@@ -11,6 +11,7 @@ from tqdm import tqdm
 from functions.birdnetlib_api import run_birdnet_analysis, on_analyze_directory_complete
 from functions.artskart_api import fetch_artskart_taxon_info_by_name
 from functions.splitter_lydfilen import split_audio_by_detection
+from functions.statistics import generate_statistics_report
 from utils import setup_ffmpeg
 
 # ----------------------------------------
@@ -289,6 +290,10 @@ def run_full_analysis(
             logging.info("Skipping audio splitting as there are no detections or DataFrame is empty.")
     else:
         logging.info("Audio splitting is disabled by configuration.")
+        
+    # Generate and print summary statistics
+    logging.info("Generating summary statistics...")
+    generate_statistics_report(output_csv_path)
 
 
 if __name__ == "__main__":
