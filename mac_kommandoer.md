@@ -6,6 +6,11 @@
         *   `--lon LONGITUDE`: Optional. Longitude. Defaults to `15.4244` if not provided.
         *   `--date YYYY-MM-DD`: Optional. Recording date. Defaults to the current date if not provided.
 
+### Delte all files
+cd "/Users/havardhjermstad-sollerud/Documents/Kodeprosjekter/python/fuglelyd_MC/data_output_lyd/lydfiler" && rm -rf *
+
+cd "/Users/havardhjermstad-sollerud/Documents/Kodeprosjekter/python/fuglelyd_MC/data_input_lyd" && rm -rf *
+
 ### Examples
 
 The input and output directories are `data_input_lyd` and `data_output_lyd` respectively, located within your project folder.
