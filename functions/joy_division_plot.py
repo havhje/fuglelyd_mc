@@ -1,21 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Joy Division-style ridgeline plot for bird species detection patterns by time of day.
-
-This script creates a visualization showing temporal activity patterns for multiple bird species,
-with each species displayed as a horizontal ridge colored by detection confidence.
-
-Usage:
-    python joy_division_plot.py --sample                    # Use sample data
-    python joy_division_plot.py --input data.csv           # Use real data
-    python joy_division_plot.py --output plot.png          # Custom output
-    python joy_division_plot.py --min-detections 10        # Filter threshold
-    python joy_division_plot.py --width 15 --height 20     # Custom size
-
-Author: Generated for Bird Detection Analysis Project
-"""
-
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -287,7 +269,7 @@ def create_joy_division_plot(
         ax.patch.set_alpha(0)
 
         # Add species label
-        ax.text(-0.01, 0.5, species, transform=ax.transAxes, fontsize=10, fontweight="bold", va="center", ha="right")
+        ax.text(-0.01, 0.1, species, transform=ax.transAxes, fontsize=10, fontweight="bold", va="bottom", ha="right")
 
         # Only show x-axis on bottom plot
         if i < n_species - 1:
@@ -306,9 +288,18 @@ def create_joy_division_plot(
     fig.text(
         0.5, 0.95, "Ridges sorted by earliest peak; Fill = Avg Confidence", ha="center", fontsize=12, style="italic"
     )
+    fig.text(
+        0.5,
+        0.925,
+        f"(Species with < {min_detections} detections excluded)",
+        ha="center",
+        fontsize=10,
+        style="italic",
+        color="gray",
+    )
 
     # Add y-axis label
-    fig.text(0.02, 0.5, "Species", rotation=90, va="center", fontsize=12, fontweight="bold")
+    fig.text(0.01, 0.5, "Species", rotation=90, va="center", fontsize=12, fontweight="bold")
 
     # Add colorbar
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
@@ -317,98 +308,19 @@ def create_joy_division_plot(
     cbar = fig.colorbar(sm, cax=cbar_ax)
     cbar.set_label("Average Confidence", rotation=270, labelpad=20, fontweight="bold")
 
+    # Add explanation text
+    fig.text(
+        0.5,
+        0.01,  # x=center, y=bottom
+        "Each ridge shows activity pattern via Kernel Density Estimation (KDE) of detection times; heights normalized per species.",
+        ha="center",
+        va="bottom",
+        fontsize=8,
+        style="italic",
+        color="gray",
+    )
+
     # Save plot
     plt.savefig(output_path, dpi=300, bbox_inches="tight", facecolor="white", edgecolor="none")
     logger.info(f"Plot saved to: {output_path}")
     plt.close()
-
-
-def main():
-    """Main function to handle command line arguments and execute plotting."""
-    parser = argparse.ArgumentParser(
-        description="Create Joy Division-style ridgeline plot of bird detection patterns",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  %(prog)s --sample                     # Generate plot with sample data
-  %(prog)s --input detections.csv       # Use real detection data
-  %(prog)s --output my_plot.png         # Custom output filename
-  %(prog)s --min-detections 15          # Require minimum 15 detections per species
-  %(prog)s --width 15 --height 20       # Custom figure dimensions
-        """,
-    )
-
-    # Input options (mutually exclusive)
-    input_group = parser.add_mutually_exclusive_group(required=True)
-    input_group.add_argument("--sample", action="store_true", help="Use generated sample data for demonstration")
-    input_group.add_argument("--input", type=Path, metavar="CSV_FILE", help="Path to CSV file with detection data")
-
-    # Output and formatting options
-    parser.add_argument(
-        "--output",
-        type=Path,
-        default=Path("bird_detection_joy_division_plot.png"),
-        help="Output file path (default: bird_detection_joy_division_plot.png)",
-    )
-    parser.add_argument(
-        "--min-detections",
-        type=int,
-        default=5,
-        metavar="N",
-        help="Minimum number of detections required per species (default: 5)",
-    )
-    parser.add_argument(
-        "--width", type=float, default=12, metavar="INCHES", help="Figure width in inches (default: 12)"
-    )
-    parser.add_argument(
-        "--height", type=float, default=16, metavar="INCHES", help="Figure height in inches (default: 16)"
-    )
-
-    # Logging options
-    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
-    parser.add_argument("--quiet", "-q", action="store_true", help="Suppress all output except errors")
-
-    args = parser.parse_args()
-
-    # Configure logging level
-    if args.quiet:
-        logging.getLogger().setLevel(logging.ERROR)
-    elif args.verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
-
-    try:
-        # Load or generate data
-        if args.sample:
-            logger.info("Generating sample bird detection data...")
-            df = generate_sample_data()
-        else:
-            logger.info(f"Loading detection data from: {args.input}")
-            df = load_detection_data(args.input)
-
-        if df.empty:
-            logger.error("No valid data available for plotting")
-            return 1
-
-        # Create output directory if needed
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-
-        # Create plot
-        logger.info("Creating Joy Division-style ridgeline plot...")
-        create_joy_division_plot(
-            df=df, output_path=args.output, figsize=(args.width, args.height), min_detections=args.min_detections
-        )
-
-        logger.info("Plot creation completed successfully!")
-        return 0
-
-    except Exception as e:
-        logger.error(f"Error: {e}")
-        if args.verbose:
-            import traceback
-
-            traceback.print_exc()
-        return 1
-
-
-if __name__ == "__main__":
-    exit(main())

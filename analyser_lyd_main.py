@@ -12,11 +12,13 @@ from functions.birdnetlib_api import run_birdnet_analysis, on_analyze_directory_
 from functions.artskart_api import fetch_artskart_taxon_info_by_name
 from functions.splitter_lydfilen import split_audio_by_detection
 from functions.statistics import generate_statistics_report
+from functions.joy_division_plot import create_joy_division_plot, load_detection_data
 from utils import setup_ffmpeg
 
 # ----------------------------------------
-# Function implementations 
+# Function implementations
 # ----------------------------------------
+
 
 def initialize_dataframe(detections_list: list) -> pd.DataFrame | None:
     """Converts a list of detections to a DataFrame and initializes required columns."""
@@ -212,18 +214,18 @@ def run_full_analysis(
     birdnet_lat: float = 68.5968,
     birdnet_date: datetime = None,
     birdnet_min_conf: float = 0.5,
-    logger_file_path: str = None
+    logger_file_path: str = None,
 ):
     """
     Runs the complete bird sound analysis pipeline.
-    
+
     Args:
         input_dir_path: Path to directory with input audio files
         output_parent_dir_path: Base directory for all outputs
         run_audio_splitting: Whether to split audio files based on detections
         max_segments_per_species: Maximum number of audio segments to save per species
         birdnet_lon: Longitude for BirdNET analysis
-        birdnet_lat: Latitude for BirdNET analysis 
+        birdnet_lat: Latitude for BirdNET analysis
         birdnet_date: Date for seasonal adjustments in BirdNET
         birdnet_min_conf: Minimum confidence threshold for BirdNET detections
         logger_file_path: Optional path to logger CSV file for real timestamp analysis
@@ -231,16 +233,16 @@ def run_full_analysis(
     # Construct specific output paths
     output_csv_path = output_parent_dir_path / "interim" / "enriched_detections.csv"
     split_audio_output_dir = output_parent_dir_path / "lydfiler"
-    
+
     # Ensure output directories exist
     output_csv_path.parent.mkdir(parents=True, exist_ok=True)
     if run_audio_splitting:
         split_audio_output_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Use current date if none specified
     if birdnet_date is None:
         birdnet_date = datetime.now()
-    
+
     logging.info(f"Starting bird sound analysis:")
     logging.info(f"  - Input directory: {input_dir_path}")
     logging.info(f"  - Output directory: {output_parent_dir_path}")
@@ -250,39 +252,56 @@ def run_full_analysis(
     logging.info(f"  - Audio splitting: {'Enabled' if run_audio_splitting else 'Disabled'}")
     if run_audio_splitting:
         logging.info(f"  - Max segments per species: {max_segments_per_species}")
-    
+
     # Create the callback function with the determined input path
     prepared_callback_function = functools.partial(on_analyze_directory_complete, base_input_path=input_dir_path)
-    
+
     # Run BirdNET analysis
     logging.info(f"Starting BirdNET analysis on input directory: {input_dir_path}")
     all_detections_list = run_birdnet_analysis(
-        input_dir_path, 
+        input_dir_path,
         prepared_callback_function,
         lon=birdnet_lon,
         lat=birdnet_lat,
         analysis_date=birdnet_date,
-        min_confidence=birdnet_min_conf
+        min_confidence=birdnet_min_conf,
     )
-    
+
     # Initialize DataFrame from detections
     detections_df = initialize_dataframe(all_detections_list)
     if detections_df is None:
         logging.info("Exiting: No detections to process.")
         return
-    
+
     logging.info(f"Successfully converted {len(detections_df)} detections to DataFrame.")
-    
+
     # Enrich with taxonomic data
     detections_df = enrich_detections_with_taxonomy(detections_df)
-    
+
     # Save the enriched DataFrame
     try:
         detections_df.to_csv(output_csv_path, index=False, sep=";")
         logging.info(f"Enriched detections saved to: {output_csv_path}")
+
+        # Generate Joy Division Plot
+        try:
+            logging.info(f"Attempting to load data for Joy Division plot from: {output_csv_path}")
+            plot_df = load_detection_data(output_csv_path)
+            if not plot_df.empty:
+                plot_output_dir = output_parent_dir_path / "figur"
+                plot_output_dir.mkdir(parents=True, exist_ok=True)
+                plot_output_path = plot_output_dir / "bird_detection_joy_division_plot.png"
+                logging.info(f"Generating Joy Division plot, will be saved to: {plot_output_path}")
+                create_joy_division_plot(df=plot_df, output_path=plot_output_path)
+                logging.info(f"Joy Division plot generated successfully: {plot_output_path}")
+            else:
+                logging.warning("DataFrame for Joy Division plot is empty. Skipping plot generation.")
+        except Exception as e:
+            logging.error(f"Error generating Joy Division plot: {e}", exc_info=True)
+
     except Exception as e:
         logging.error(f"Failed to save enriched detections to CSV: {e}", exc_info=True)
-    
+
     # After saving the CSV, split the audio files if the flag is True
     if run_audio_splitting:
         if detections_df is not None and not detections_df.empty:
@@ -292,84 +311,97 @@ def run_full_analysis(
             logging.info("Skipping audio splitting as there are no detections or DataFrame is empty.")
     else:
         logging.info("Audio splitting is disabled by configuration.")
-        
+
     # Generate and print summary statistics
     logging.info("Generating summary statistics...")
     generate_statistics_report(output_csv_path, logger_file_path)
+
+    logging.info("Full analysis process finished.")
 
 
 if __name__ == "__main__":
     # Set up logging
     log_format = "%(asctime)s - %(levelname)s - %(message)s"
     logging.basicConfig(level=logging.INFO, format=log_format)
-    
+
     # Initialize multiprocessing support for frozen executables
     multiprocessing.freeze_support()
-    
+
     # Configure ffmpeg paths for pydub
     if not setup_ffmpeg():
         logging.error("Failed to configure FFmpeg. Audio splitting may not work correctly.")
         logging.error("Make sure ffmpeg and ffprobe are in the ffmpeg_macos_bin directory.")
-    
+
     # Setup argument parser
     parser = argparse.ArgumentParser(description="Analyze bird sounds in audio files using BirdNET")
-    
-    parser.add_argument('--input_dir', type=str, required=True,
-                        help="Path to the directory containing input audio files")
-    
-    parser.add_argument('--output_dir', type=str, required=True,
-                        help="Path to the base directory for outputs (interim CSV and lydfiler will be created here)")
-    
-    parser.add_argument('--lat', type=float, required=True,
-                        help="Latitude for BirdNET analysis (e.g., 68.59)")
-    
-    parser.add_argument('--lon', type=float, required=True,
-                        help="Longitude for BirdNET analysis (e.g., 15.42)")
-    
-    parser.add_argument('--date', type=str, required=True,
-                        help="Date for BirdNET analysis (YYYY-MM-DD)")
-    
-    parser.add_argument('--min_conf', type=float, default=0.5,
-                        help="Minimum confidence for BirdNET detections (0.0-1.0, default: 0.5)")
-    
-    parser.add_argument('--no_split', action='store_true',
-                        help="Disable audio splitting of detections")
-    
-    parser.add_argument('--max_segments', type=int, default=10,
-                        help="Max audio clips per species for splitting (default: 10). Only used if audio splitting is enabled")
-    
-    parser.add_argument('--log_level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
-                        default='INFO', help="Set the logging level")
-    
-    parser.add_argument('--logger_file', type=str, default=None,
-                        help="Path to logger CSV file for real timestamp analysis (optional)")
-    
+
+    parser.add_argument(
+        "--input_dir", type=str, required=True, help="Path to the directory containing input audio files"
+    )
+
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        required=True,
+        help="Path to the base directory for outputs (interim CSV and lydfiler will be created here)",
+    )
+
+    parser.add_argument("--lat", type=float, required=True, help="Latitude for BirdNET analysis (e.g., 68.59)")
+
+    parser.add_argument("--lon", type=float, required=True, help="Longitude for BirdNET analysis (e.g., 15.42)")
+
+    parser.add_argument("--date", type=str, required=True, help="Date for BirdNET analysis (YYYY-MM-DD)")
+
+    parser.add_argument(
+        "--min_conf", type=float, default=0.5, help="Minimum confidence for BirdNET detections (0.0-1.0, default: 0.5)"
+    )
+
+    parser.add_argument("--no_split", action="store_true", help="Disable audio splitting of detections")
+
+    parser.add_argument(
+        "--max_segments",
+        type=int,
+        default=10,
+        help="Max audio clips per species for splitting (default: 10). Only used if audio splitting is enabled",
+    )
+
+    parser.add_argument(
+        "--log_level",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        default="INFO",
+        help="Set the logging level",
+    )
+
+    parser.add_argument(
+        "--logger_file", type=str, default=None, help="Path to logger CSV file for real timestamp analysis (optional)"
+    )
+
     # Parse arguments
     args = parser.parse_args()
-    
+
     # Set logging level based on argument
     logging.getLogger().setLevel(getattr(logging, args.log_level))
-    
+
     # Process and validate date
     try:
-        analysis_date = datetime.strptime(args.date, '%Y-%m-%d')
+        analysis_date = datetime.strptime(args.date, "%Y-%m-%d")
     except ValueError:
         logging.error("Invalid date format. Please use YYYY-MM-DD.")
         sys.exit(1)
-    
+
     # Validate min_conf (0.0 to 1.0)
     if args.min_conf < 0.0 or args.min_conf > 1.0:
         logging.error("Invalid min_conf value. Must be between 0.0 and 1.0.")
         sys.exit(1)
-    
+
     # Validate max_segments
     if args.max_segments < 0:
         logging.error("Invalid max_segments value. Must be a non-negative integer.")
         sys.exit(1)
-    
+
     # Determine run_audio_splitting from args
     run_audio_splitting = not args.no_split
-    
+
     # Run the full analysis pipeline
     run_full_analysis(
         input_dir_path=Path(args.input_dir),
@@ -380,5 +412,5 @@ if __name__ == "__main__":
         birdnet_lat=args.lat,
         birdnet_date=analysis_date,
         birdnet_min_conf=args.min_conf,
-        logger_file_path=args.logger_file
+        logger_file_path=args.logger_file,
     )
