@@ -26,6 +26,7 @@ import argparse
 import logging
 from typing import Tuple, List, Dict, Optional
 import warnings
+from functions.temporal_analysis import add_real_timestamps
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -70,15 +71,19 @@ def load_detection_data(csv_path: Path) -> pd.DataFrame:
         if missing_cols:
             raise ValueError(f"Missing required columns: {missing_cols}")
 
-        # Handle time extraction
-        if "hour_of_day" not in df.columns:
+        # Use add_real_timestamps to get hour_of_day from filenames
+        logger.info("Attempting to derive real timestamps from filenames...")
+        df = add_real_timestamps(df)
+
+        if "hour_of_day" not in df.columns or df["hour_of_day"].isnull().all():
+            logger.warning("Failed to derive 'hour_of_day' from filenames via add_real_timestamps.")
+            # Fallback if add_real_timestamps doesn't populate hour_of_day, though it should.
             if "start_time" in df.columns:
-                # Convert start_time (seconds) to hour_of_day
+                logger.info("Falling back to calculating hour_of_day from 'start_time' as offset from midnight.")
                 df["hour_of_day"] = (df["start_time"] / 3600) % 24
-                logger.info("Converted start_time to hour_of_day")
             else:
-                logger.warning("No hour_of_day or start_time column found. Cannot create temporal plot.")
-                return pd.DataFrame()
+                logger.error("Cannot determine hour_of_day. 'start_time' column also missing.")
+                return pd.DataFrame()  # Return empty if no time data
 
         # Validate data ranges
         df = df.dropna(subset=["hour_of_day", "confidence", "Species_NorwegianName"])
