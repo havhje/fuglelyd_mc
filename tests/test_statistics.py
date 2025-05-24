@@ -84,6 +84,7 @@ class TestStatistics(unittest.TestCase):
                     "Haukefugler",
                 ],
                 "Redlist_Status": ["LC", "LC", "LC", "LC", "LC", "LC", "VU", "NT"],
+                "confidence": [0.85, 0.87, 0.72, 0.65, 0.55, 0.43, 0.88, 0.78],
             }
         )
 
@@ -129,6 +130,28 @@ class TestStatistics(unittest.TestCase):
 
         # Test observations per order
         self.assertEqual(stats["observations_per_order"]["Spurvefugler"], 6)
+
+        # Test confidence statistics
+        self.assertIn("confidence_overall", stats)
+        self.assertAlmostEqual(stats["confidence_overall"]["mean"], 0.716, places=3)
+        self.assertEqual(stats["confidence_overall"]["min"], 0.43)
+        self.assertEqual(stats["confidence_overall"]["max"], 0.88)
+
+        # Test confidence by species
+        self.assertIn("confidence_by_species", stats)
+        self.assertAlmostEqual(stats["confidence_by_species"]["Kjøttmeis"]["mean"], 0.543, places=3)
+        self.assertEqual(stats["confidence_by_species"]["Kjøttmeis"]["count"], 3)
+
+        # Test confidence distribution
+        self.assertIn("confidence_distribution", stats)
+        self.assertEqual(stats["confidence_distribution"]["very_high"]["count"], 0)
+        self.assertEqual(stats["confidence_distribution"]["high"]["count"], 5)
+        self.assertEqual(stats["confidence_distribution"]["medium"]["count"], 2)
+        self.assertEqual(stats["confidence_distribution"]["low"]["count"], 1)
+
+        # Test high confidence detections (>0.8)
+        self.assertIn("high_confidence_detections", stats)
+        self.assertEqual(stats["high_confidence_detections"]["count"], 3)
 
     def test_calculate_summary_statistics_empty_df(self):
         """Test handling of empty DataFrame"""
@@ -281,6 +304,7 @@ class TestMainIntegration(unittest.TestCase):
                 "Species_NorwegianName": ["Ravn", "Kongeørn", "Vandrefalk"],
                 "Order_NorwegianName": ["Spurvefugler", "Haukefugler", "Falkefugler"],
                 "Redlist_Status": ["LC", "NT", "VU"],
+                "confidence": [0.85, 0.67, 0.92],
             }
         )
 
