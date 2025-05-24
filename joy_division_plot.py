@@ -1,359 +1,404 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-Joy Division-style ridgeline plot for bird detection patterns by time of day.
-Creates a stacked ridgeline visualization where each species gets its own ridge,
-colored by average confidence and showing detection density throughout the day.
+Joy Division-style ridgeline plot for bird species detection patterns by time of day.
+
+This script creates a visualization showing temporal activity patterns for multiple bird species,
+with each species displayed as a horizontal ridge colored by detection confidence.
+
+Usage:
+    python joy_division_plot.py --sample                    # Use sample data
+    python joy_division_plot.py --input data.csv           # Use real data
+    python joy_division_plot.py --output plot.png          # Custom output
+    python joy_division_plot.py --min-detections 10        # Filter threshold
+    python joy_division_plot.py --width 15 --height 20     # Custom size
+
+Author: Generated for Bird Detection Analysis Project
 """
 
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
-from scipy import stats
+from scipy.stats import gaussian_kde
 from pathlib import Path
 import argparse
 import logging
-from typing import Dict, List, Tuple, Optional
+from typing import Tuple, List, Dict, Optional
+import warnings
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 
 def load_detection_data(csv_path: Path) -> pd.DataFrame:
     """
-    Load and prepare detection data from CSV file
-
+    Load bird detection data from CSV file.
+    
     Args:
-        csv_path: Path to enriched detections CSV
-
+        csv_path: Path to CSV file with semicolon separators
+        
     Returns:
-        Cleaned DataFrame with hour_of_day column
+        DataFrame with detection data
+        
+    Raises:
+        FileNotFoundError: If CSV file doesn't exist
+        ValueError: If required columns are missing
     """
+    if not csv_path.exists():
+        raise FileNotFoundError(f"CSV file not found: {csv_path}")
+    
     try:
-        df = pd.read_csv(csv_path, sep=";")
-
-        # Add hour extraction if not present
-        if "hour_of_day" not in df.columns:
-            # Try to extract from timestamp in filename
-            from functions.temporal_analysis import add_real_timestamps
-
-            df = add_real_timestamps(df)
-
-        # Filter out rows without valid species names or hour data
-        df = df.dropna(subset=["Species_NorwegianName"])
-
-        # If still no hour_of_day, try to extract from start_time assuming it's seconds from start of day
-        if "hour_of_day" not in df.columns and "start_time" in df.columns:
-            # Assume start_time is seconds from beginning of recording
-            # This is a fallback - ideally we'd have proper timestamps
-            df["hour_of_day"] = (df["start_time"] / 3600) % 24
-
-        return df
-
-    except Exception as e:
-        logging.error(f"Error loading detection data: {e}")
-        return pd.DataFrame()
-
-
-def calculate_species_stats(df: pd.DataFrame, min_detections: int = 5) -> Dict:
-    """
-    Calculate hourly detection patterns and average confidence for each species
-
-    Args:
-        df: Detection DataFrame
-        min_detections: Minimum number of detections required for a species to be included
-
-    Returns:
-        Dictionary with species statistics
-    """
-    species_stats = {}
-
-    for species in df["Species_NorwegianName"].unique():
-        if pd.isna(species):
-            continue
-
-        species_data = df[df["Species_NorwegianName"] == species].copy()
-
-        # Skip species with too few detections
-        if len(species_data) < min_detections:
-            continue
-
-        # Calculate average confidence
-        avg_confidence = species_data["confidence"].mean() if "confidence" in species_data.columns else 0.8
-
-        # Calculate hourly detection counts
-        hourly_counts = species_data.groupby("hour_of_day").size()
-
-        # Find peak activity hour for sorting
-        peak_hour = hourly_counts.idxmax() if not hourly_counts.empty else 12
-
-        # Create smooth density curve using KDE
-        hours = species_data["hour_of_day"].values
-        if len(hours) > 1:
-            # Create kernel density estimate
-            kde = stats.gaussian_kde(hours)
-            hour_range = np.linspace(0, 24, 100)
-            density = kde(hour_range)
-            # Normalize density
-            density = density / density.max() if density.max() > 0 else density
+        # Try different encodings
+        for encoding in ['utf-8', 'utf-8-sig', 'latin-1', 'cp1252']:
+            try:
+                df = pd.read_csv(csv_path, sep=';', encoding=encoding)
+                logger.info(f"Successfully loaded CSV with {encoding} encoding")
+                break
+            except UnicodeDecodeError:
+                continue
         else:
-            # Single detection - create a spike
-            hour_range = np.linspace(0, 24, 100)
-            density = np.zeros(100)
-            closest_idx = np.argmin(np.abs(hour_range - hours[0]))
-            density[closest_idx] = 1.0
-
-        species_stats[species] = {
-            "avg_confidence": avg_confidence,
-            "peak_hour": peak_hour,
-            "total_detections": len(species_data),
-            "hour_range": hour_range,
-            "density": density,
-            "hourly_counts": hourly_counts.to_dict(),
-        }
-
-    return species_stats
-
-
-def create_joy_division_plot(
-    species_stats: Dict, output_path: Optional[Path] = None, figsize: Tuple[int, int] = (12, 16)
-) -> None:
-    """
-    Create Joy Division-style ridgeline plot
-
-    Args:
-        species_stats: Dictionary of species statistics
-        output_path: Optional path to save the plot
-        figsize: Figure size tuple
-    """
-    if not species_stats:
-        logging.warning("No species data available for plotting")
-        return
-
-    # Sort species by peak activity hour (earliest first)
-    sorted_species = sorted(species_stats.items(), key=lambda x: x[1]["peak_hour"])
-
-    n_species = len(sorted_species)
-
-    # Create figure and axis
-    fig, ax = plt.subplots(figsize=figsize, facecolor="white")
-
-    # Set up colormap for confidence values
-    cmap = plt.cm.inferno  # Changed from plasma to inferno
-    confidence_values = [stats["avg_confidence"] for _, stats in sorted_species]
-
-    # Determine min/max for normalization, handling empty list
-    min_conf = min(confidence_values) if confidence_values else 0.70
-    max_conf = max(confidence_values) if confidence_values else 0.95
-    norm = mcolors.Normalize(vmin=min_conf, vmax=max_conf)
-
-    # Ridge spacing and scaling - adjust for overlap and appearance
-    ridge_height = 1.0  # Adjusted for appearance
-    ridge_spacing = 0.7  # Adjusted for appearance
-
-    # Plot each species as a ridge
-    y_positions = []
-    species_names = []
-
-    for i, (species, stats) in enumerate(sorted_species):
-        y_base = i * ridge_spacing
-        y_positions.append(y_base)
-        # Shorten long species names if necessary for display
-        display_species_name = species[:30] + "..." if len(species) > 30 else species
-        species_names.append(display_species_name)
-
-        # Get color based on confidence
-        color = cmap(norm(stats["avg_confidence"]))
-
-        # Scale density for visual appeal - ridges point upwards
-        scaled_density = stats["density"] * ridge_height
-
-        # Create the ridge line - pointing upwards from baseline
-        hour_range = stats["hour_range"]
-        y_values = y_base + scaled_density  # Add to base (upwards)
-
-        # Fill the area under the curve
-        ax.fill_between(hour_range, y_base, y_values, color=color, alpha=0.9, linewidth=0)  # Increased alpha
-
-        # Remove outline for cleaner look like the example
-        # ax.plot(hour_range, y_values, color="black", linewidth=0.5, alpha=0.7)
-
-        # Baseline removed for cleaner look
-        # ax.axhline(y=y_base, color="black", linewidth=0.3, alpha=0.3)
-
-    # Customize the plot
-    ax.set_xlim(-1, 25)  # Adjusted for a bit of padding
-    ax.set_ylim(-0.5, (n_species - 1) * ridge_spacing + ridge_height + 0.5)
-
-    # Set x-axis (hours)
-    ax.set_xlabel("Hour of Day", fontsize=14, fontweight="normal")  # Removed bold
-    hour_ticks = list(range(0, 31, 10))  # Changed ticks to 0, 10, 20, 30
-    ax.set_xticks(hour_ticks)
-    ax.set_xticklabels([f"{h}" for h in hour_ticks], fontsize=10)  # Removed leading zero formatting
-
-    # Set y-axis (species)
-    ax.set_ylabel("Species", fontsize=14, fontweight="normal")  # Removed bold
-    ax.set_yticks(y_positions)
-    ax.set_yticklabels(species_names, fontsize=9)  # Adjusted fontsize
-
-    # Invert y-axis so earliest peak species are at top
-    ax.invert_yaxis()
-
-    # Add vertical grid lines only
-    ax.xaxis.grid(True, alpha=0.5, linestyle="-", linewidth=0.7)  # Adjusted alpha and linewidth
-    ax.yaxis.grid(False)  # Turn off horizontal grid lines
-    ax.set_axisbelow(True)
-
-    # Add title and subtitle
-    ax.set_title("Bird Detection Patterns by Time of Day", fontsize=16, fontweight="bold", pad=30)  # Adjusted padding
-    fig.suptitle(
-        "Ridges sorted by earliest peak; Fill = Avg Confidence", fontsize=10, y=0.93, style="italic", x=0.52
-    )  # Used fig.suptitle for better placement
-
-    # Add colorbar
-    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-    sm.set_array([])  # Important for stand-alone colorbar
-
-    # Position colorbar to the right, similar to example
-    cbar_ax = fig.add_axes([0.82, 0.4, 0.03, 0.3])  # [left, bottom, width, height] in figure coords
-    cbar = plt.colorbar(sm, cax=cbar_ax)  # Use the new axes for the colorbar
-
-    cbar.set_label("Avg % Confidence", fontsize=10, fontweight="bold", labelpad=10)  # Adjusted fontsize and padding
-
-    # Set specific ticks for the colorbar if desired, e.g., [0.75, 0.80, 0.85, 0.90]
-    # These should ideally be derived from the actual data's range or desired presentation
-    # For now, let's use a few ticks based on the norm.
-    cbar_ticks_to_show = np.linspace(min_conf, max_conf, 4)
-    if min_conf == 0.70 and max_conf == 0.95:  # Default if no confidence values
-        cbar_ticks_to_show = [0.75, 0.80, 0.85, 0.90]
-
-    cbar.set_ticks(cbar_ticks_to_show)
-    cbar.set_ticklabels([f"{tick:.2f}" for tick in cbar_ticks_to_show], fontsize=9)
-    cbar.ax.tick_params(labelsize=9)
-
-    # Adjust layout - tight_layout might conflict with manually placed suptitle and colorbar
-    # plt.tight_layout() # Removed for more manual control
-    fig.subplots_adjust(left=0.2, right=0.78, top=0.88, bottom=0.1)  # Manually adjust subplot
-
-    # Save or show
-    if output_path:
-        plt.savefig(output_path, dpi=300, bbox_inches="tight", facecolor="white", edgecolor="none")
-        print(f"Plot saved to: {output_path}")
-    else:
-        plt.show()
-
-    plt.close()
+            raise ValueError("Could not decode CSV file with any common encoding")
+            
+        logger.info(f"Loaded {len(df)} detections from {csv_path}")
+        
+        # Check for required columns
+        required_cols = ['Species_NorwegianName', 'confidence']
+        missing_cols = [col for col in required_cols if col not in df.columns]
+        
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+        
+        # Handle time extraction
+        if 'hour_of_day' not in df.columns:
+            if 'start_time' in df.columns:
+                # Convert start_time (seconds) to hour_of_day
+                df['hour_of_day'] = (df['start_time'] / 3600) % 24
+                logger.info("Converted start_time to hour_of_day")
+            else:
+                logger.warning("No hour_of_day or start_time column found. Cannot create temporal plot.")
+                return pd.DataFrame()
+        
+        # Validate data ranges
+        df = df.dropna(subset=['hour_of_day', 'confidence', 'Species_NorwegianName'])
+        df = df[(df['hour_of_day'] >= 0) & (df['hour_of_day'] < 24)]
+        df = df[(df['confidence'] >= 0) & (df['confidence'] <= 1)]
+        
+        logger.info(f"After validation: {len(df)} valid detections")
+        return df
+        
+    except Exception as e:
+        logger.error(f"Error loading CSV file: {e}")
+        raise
 
 
 def generate_sample_data() -> pd.DataFrame:
     """
-    Generate sample data for testing the plot
+    Generate realistic sample bird detection data for demonstration.
+    
+    Returns:
+        DataFrame with sample detection data
     """
-    np.random.seed(42)
-
-    # Sample Norwegian bird species with different activity patterns
-    species_patterns = {
-        "Sanglerke": {"peak": 5, "spread": 2, "confidence": 0.85},  # Dawn singer
-        "Rødstrupe": {"peak": 6, "spread": 3, "confidence": 0.82},  # Robin
-        "Gråtrost": {"peak": 7, "spread": 4, "confidence": 0.79},  # Blackbird
-        "Meiser": {"peak": 8, "spread": 5, "confidence": 0.77},  # Tits
-        "Kråkefugl": {"peak": 10, "spread": 6, "confidence": 0.75},  # Crows
-        "Måke": {"peak": 12, "spread": 4, "confidence": 0.73},  # Gulls
-        "Spurvefugl": {"peak": 14, "spread": 3, "confidence": 0.81},  # Sparrows
-        "Finker": {"peak": 16, "spread": 3, "confidence": 0.83},  # Finches
-        "Ugle": {"peak": 22, "spread": 2, "confidence": 0.88},  # Owls
+    np.random.seed(42)  # For reproducible results
+    
+    # Norwegian bird species with different activity patterns
+    species_data = {
+        'r�dstrupe': {'peak_hour': 6.0, 'std': 1.5, 'confidence': 0.85, 'n_detections': 120},
+        'l�vsanger': {'peak_hour': 6.5, 'std': 2.0, 'confidence': 0.82, 'n_detections': 95},
+        'bj�rk': {'peak_hour': 7.0, 'std': 1.8, 'confidence': 0.78, 'n_detections': 80},
+        'm�ltrost': {'peak_hour': 8.5, 'std': 3.0, 'confidence': 0.80, 'n_detections': 70},
+        'gr�meis': {'peak_hour': 12.0, 'std': 4.0, 'confidence': 0.75, 'n_detections': 60},
+        'kr�ke': {'peak_hour': 14.0, 'std': 5.0, 'confidence': 0.88, 'n_detections': 45},
+        'turdus': {'peak_hour': 19.0, 'std': 2.5, 'confidence': 0.83, 'n_detections': 55},
+        'nattravn': {'peak_hour': 22.0, 'std': 2.0, 'confidence': 0.90, 'n_detections': 35},
+        'hornugle': {'peak_hour': 2.0, 'std': 1.5, 'confidence': 0.92, 'n_detections': 25}
     }
+    
+    detections = []
+    
+    for species, params in species_data.items():
+        n_detections = params['n_detections']
+        peak_hour = params['peak_hour']
+        std = params['std']
+        base_confidence = params['confidence']
+        
+        # Generate hours with Gaussian distribution around peak
+        hours = np.random.normal(peak_hour, std, n_detections)
+        # Handle wrapping around 24-hour cycle
+        hours = hours % 24
+        
+        # Generate confidence scores with some variation
+        confidences = np.random.normal(base_confidence, 0.05, n_detections)
+        confidences = np.clip(confidences, 0.0, 1.0)
+        
+        # Create detection records
+        for hour, conf in zip(hours, confidences):
+            detections.append({
+                'Species_NorwegianName': species,
+                'hour_of_day': hour,
+                'confidence': conf,
+                'filename': f'sample_recording_{int(hour):02d}{int((hour % 1) * 60):02d}.wav'
+            })
+    
+    df = pd.DataFrame(detections)
+    logger.info(f"Generated {len(df)} sample detections for {len(species_data)} species")
+    return df
 
-    data = []
 
-    for species, pattern in species_patterns.items():
-        n_detections = np.random.randint(20, 100)
+def prepare_species_data(df: pd.DataFrame, min_detections: int = 5) -> Tuple[List[str], Dict]:
+    """
+    Prepare species data for plotting, calculating statistics and sorting by peak activity.
+    
+    Args:
+        df: DataFrame with detection data
+        min_detections: Minimum number of detections required per species
+        
+    Returns:
+        Tuple of (sorted species list, species statistics dict)
+    """
+    species_stats = {}
+    
+    for species in df['Species_NorwegianName'].unique():
+        species_data = df[df['Species_NorwegianName'] == species]
+        
+        if len(species_data) < min_detections:
+            logger.info(f"Skipping {species}: only {len(species_data)} detections (< {min_detections})")
+            continue
+        
+        hours = species_data['hour_of_day'].values
+        confidences = species_data['confidence'].values
+        
+        # Calculate peak hour (weighted by confidence)
+        weights = confidences / confidences.sum()
+        peak_hour = np.average(hours, weights=weights)
+        
+        # Calculate average confidence
+        avg_confidence = confidences.mean()
+        
+        species_stats[species] = {
+            'peak_hour': peak_hour,
+            'avg_confidence': avg_confidence,
+            'n_detections': len(species_data),
+            'hours': hours,
+            'confidences': confidences
+        }
+    
+    # Sort species by peak hour (dawn singers first)
+    sorted_species = sorted(species_stats.keys(), key=lambda x: species_stats[x]['peak_hour'])
+    
+    logger.info(f"Prepared data for {len(sorted_species)} species")
+    return sorted_species, species_stats
 
-        # Generate hours around the peak with some spread
-        hours = np.random.normal(pattern["peak"], pattern["spread"], n_detections)
-        hours = np.clip(hours, 0, 23.99)  # Keep within 24-hour range
 
-        # Generate confidence values around the average
-        confidences = np.random.normal(pattern["confidence"], 0.05, n_detections)
-        confidences = np.clip(confidences, 0.5, 1.0)  # Keep within valid range
-
-        for i in range(n_detections):
-            data.append(
-                {
-                    "Species_NorwegianName": species,
-                    "hour_of_day": hours[i],
-                    "confidence": confidences[i],
-                    "start_time": hours[i] * 3600,  # Convert to seconds
-                }
-            )
-
-    return pd.DataFrame(data)
+def create_joy_division_plot(df: pd.DataFrame, output_path: Path, 
+                           figsize: Tuple[float, float] = (12, 16),
+                           min_detections: int = 5) -> None:
+    """
+    Create Joy Division-style ridgeline plot of bird detection patterns.
+    
+    Args:
+        df: DataFrame with detection data
+        output_path: Path for output image file
+        figsize: Figure size as (width, height) in inches
+        min_detections: Minimum detections required per species
+    """
+    if df.empty:
+        logger.error("No data available for plotting")
+        return
+    
+    # Prepare species data
+    sorted_species, species_stats = prepare_species_data(df, min_detections)
+    
+    if not sorted_species:
+        logger.error("No species meet minimum detection criteria")
+        return
+    
+    n_species = len(sorted_species)
+    
+    # Create figure and subplots
+    fig, axes = plt.subplots(n_species, 1, figsize=figsize, sharex=True)
+    if n_species == 1:
+        axes = [axes]
+    
+    # Set up colormap based on confidence range
+    all_confidences = [species_stats[sp]['avg_confidence'] for sp in sorted_species]
+    conf_min, conf_max = min(all_confidences), max(all_confidences)
+    if conf_max - conf_min < 0.01:  # Avoid division by zero
+        conf_min -= 0.05
+        conf_max += 0.05
+    
+    norm = plt.Normalize(vmin=conf_min, vmax=conf_max)
+    cmap = plt.cm.plasma
+    
+    # Create ridgelines
+    x_range = np.linspace(0, 24, 1000)
+    
+    for i, species in enumerate(sorted_species):
+        ax = axes[i]
+        stats = species_stats[species]
+        hours = stats['hours']
+        avg_conf = stats['avg_confidence']
+        
+        try:
+            # Create KDE for smooth curve
+            if len(hours) > 1:
+                kde = gaussian_kde(hours)
+                kde.set_bandwidth(kde.factor * 0.8)  # Slightly smoother
+                density = kde(x_range)
+            else:
+                # Fallback for single detection
+                density = np.zeros_like(x_range)
+                closest_idx = np.argmin(np.abs(x_range - hours[0]))
+                density[closest_idx] = 1.0
+                
+        except Exception as e:
+            logger.warning(f"KDE failed for {species}: {e}. Using histogram fallback.")
+            hist, bins = np.histogram(hours, bins=50, range=(0, 24), density=True)
+            x_centers = (bins[:-1] + bins[1:]) / 2
+            density = np.interp(x_range, x_centers, hist)
+        
+        # Normalize density to 0-1 range
+        if density.max() > 0:
+            density = density / density.max()
+        
+        # Color based on average confidence
+        color = cmap(norm(avg_conf))
+        
+        # Fill the ridgeline
+        ax.fill_between(x_range, 0, density, color=color, alpha=0.9)
+        ax.plot(x_range, density, color='black', linewidth=0.8, alpha=0.8)
+        
+        # Configure subplot
+        ax.set_ylim(0, 1)
+        ax.set_xlim(0, 24)
+        ax.set_yticks([])
+        ax.set_ylabel('')
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_visible(False)
+        ax.patch.set_alpha(0)
+        
+        # Add species label
+        ax.text(0.5, 0.5, species, transform=ax.transAxes, 
+               fontsize=10, fontweight='bold', va='center', ha='left')
+        
+        # Only show x-axis on bottom plot
+        if i < n_species - 1:
+            ax.set_xticks([])
+    
+    # Configure overall plot
+    plt.subplots_adjust(hspace=-0.4)  # Overlap ridges for dramatic effect
+    
+    # Set up bottom axis
+    axes[-1].set_xlabel('Hour of Day', fontsize=12, fontweight='bold')
+    axes[-1].set_xticks([0, 6, 12, 18, 24])
+    axes[-1].set_xticklabels(['0', '6', '12', '18', '24'])
+    
+    # Add title and subtitle
+    fig.suptitle('Bird Detection Patterns by Time of Day', 
+                fontsize=16, fontweight='bold', y=0.98)
+    fig.text(0.5, 0.95, 'Ridges sorted by earliest peak; Fill = Avg Confidence',
+             ha='center', fontsize=12, style='italic')
+    
+    # Add y-axis label
+    fig.text(0.02, 0.5, 'Species', rotation=90, va='center', 
+             fontsize=12, fontweight='bold')
+    
+    # Add colorbar
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    cbar_ax = fig.add_axes([0.92, 0.15, 0.02, 0.7])
+    cbar = fig.colorbar(sm, cax=cbar_ax)
+    cbar.set_label('Average Confidence', rotation=270, labelpad=20, fontweight='bold')
+    
+    # Save plot
+    plt.savefig(output_path, dpi=300, bbox_inches='tight', 
+                facecolor='white', edgecolor='none')
+    logger.info(f"Plot saved to: {output_path}")
+    plt.close()
 
 
 def main():
-    """Main function with command line interface"""
-    parser = argparse.ArgumentParser(description="Generate Joy Division-style bird detection plot")
-
-    parser.add_argument("--input", "-i", type=str, help="Path to enriched detections CSV file")
-    parser.add_argument("--output", "-o", type=str, help="Output path for the plot (PNG/PDF)")
-    parser.add_argument("--sample", action="store_true", help="Use sample data instead of real data")
-    parser.add_argument(
-        "--min-detections", type=int, default=5, help="Minimum detections required per species (default: 5)"
+    """Main function to handle command line arguments and execute plotting."""
+    parser = argparse.ArgumentParser(
+        description="Create Joy Division-style ridgeline plot of bird detection patterns",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s --sample                     # Generate plot with sample data
+  %(prog)s --input detections.csv       # Use real detection data
+  %(prog)s --output my_plot.png         # Custom output filename
+  %(prog)s --min-detections 15          # Require minimum 15 detections per species
+  %(prog)s --width 15 --height 20       # Custom figure dimensions
+        """
     )
-    parser.add_argument("--width", type=int, default=12, help="Figure width in inches (default: 12)")
-    parser.add_argument("--height", type=int, default=16, help="Figure height in inches (default: 16)")
-
+    
+    # Input options (mutually exclusive)
+    input_group = parser.add_mutually_exclusive_group(required=True)
+    input_group.add_argument('--sample', action='store_true',
+                           help='Use generated sample data for demonstration')
+    input_group.add_argument('--input', type=Path, metavar='CSV_FILE',
+                           help='Path to CSV file with detection data')
+    
+    # Output and formatting options
+    parser.add_argument('--output', type=Path, default=Path('bird_detection_joy_division_plot.png'),
+                       help='Output file path (default: bird_detection_joy_division_plot.png)')
+    parser.add_argument('--min-detections', type=int, default=5, metavar='N',
+                       help='Minimum number of detections required per species (default: 5)')
+    parser.add_argument('--width', type=float, default=12, metavar='INCHES',
+                       help='Figure width in inches (default: 12)')
+    parser.add_argument('--height', type=float, default=16, metavar='INCHES',
+                       help='Figure height in inches (default: 16)')
+    
+    # Logging options
+    parser.add_argument('--verbose', '-v', action='store_true',
+                       help='Enable verbose logging')
+    parser.add_argument('--quiet', '-q', action='store_true',
+                       help='Suppress all output except errors')
+    
     args = parser.parse_args()
-
-    # Setup logging
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
-
-    # Load data
-    if args.sample:
-        print("Generating sample data...")
-        df = generate_sample_data()
-    elif args.input:
-        input_path = Path(args.input)
-        if not input_path.exists():
-            logging.error(f"Input file not found: {input_path}")
-            return 1
-        print(f"Loading data from: {input_path}")
-        df = load_detection_data(input_path)
-    else:
-        # Try to find default CSV in output directory
-        default_csv = Path("data_output_lyd/interim/enriched_detections.csv")
-        if default_csv.exists():
-            print(f"Loading data from default location: {default_csv}")
-            df = load_detection_data(default_csv)
+    
+    # Configure logging level
+    if args.quiet:
+        logging.getLogger().setLevel(logging.ERROR)
+    elif args.verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
+    
+    try:
+        # Load or generate data
+        if args.sample:
+            logger.info("Generating sample bird detection data...")
+            df = generate_sample_data()
         else:
-            logging.error("No input file specified and default CSV not found. Use --sample or --input")
+            logger.info(f"Loading detection data from: {args.input}")
+            df = load_detection_data(args.input)
+        
+        if df.empty:
+            logger.error("No valid data available for plotting")
             return 1
-
-    if df.empty:
-        logging.error("No data available for plotting")
+        
+        # Create output directory if needed
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Create plot
+        logger.info("Creating Joy Division-style ridgeline plot...")
+        create_joy_division_plot(
+            df=df,
+            output_path=args.output,
+            figsize=(args.width, args.height),
+            min_detections=args.min_detections
+        )
+        
+        logger.info("Plot creation completed successfully!")
+        return 0
+        
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        if args.verbose:
+            import traceback
+            traceback.print_exc()
         return 1
-
-    print(f"Loaded {len(df)} detections for {df['Species_NorwegianName'].nunique()} species")
-
-    # Calculate species statistics
-    species_stats = calculate_species_stats(df, min_detections=args.min_detections)
-
-    if not species_stats:
-        logging.error(f"No species found with at least {args.min_detections} detections")
-        return 1
-
-    print(f"Creating plot for {len(species_stats)} species...")
-
-    # Set output path
-    output_path = None
-    if args.output:
-        output_path = Path(args.output)
-    elif not args.sample:
-        # Default output name based on input
-        output_path = Path("bird_detection_joy_division_plot.png")
-
-    # Create the plot
-    create_joy_division_plot(species_stats, output_path, figsize=(args.width, args.height))
-
-    print("Plot generation complete!")
-    return 0
 
 
 if __name__ == "__main__":
