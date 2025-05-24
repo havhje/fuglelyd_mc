@@ -29,8 +29,8 @@ def calculate_summary_statistics(df: pd.DataFrame, logger_file_path: str = None)
     species_counts = df["Species_NorwegianName"].value_counts().to_dict()
     stats["observations_per_species"] = species_counts
     
-    # Top 5 most detected species
-    stats["top_species"] = dict(sorted(species_counts.items(), key=lambda x: x[1], reverse=True)[:5])
+    # Top 10 most detected species
+    stats["top_species"] = dict(sorted(species_counts.items(), key=lambda x: x[1], reverse=True)[:10])
     
     # Number of unique species
     stats["unique_species_count"] = df["Species_NorwegianName"].nunique()
