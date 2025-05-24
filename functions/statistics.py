@@ -2,14 +2,16 @@ import pandas as pd
 import logging
 from pathlib import Path
 from typing import Dict, List, Tuple
+from .temporal_analysis import generate_temporal_summary, print_temporal_analysis
 
 
-def calculate_summary_statistics(df: pd.DataFrame) -> Dict:
+def calculate_summary_statistics(df: pd.DataFrame, logger_file_path: str = None) -> Dict:
     """
     Calculate summary statistics from the detection DataFrame
     
     Args:
         df: DataFrame containing enriched detection data
+        logger_file_path: Optional path to logger CSV file for real timestamp analysis
         
     Returns:
         Dictionary containing various summary statistics
@@ -113,6 +115,10 @@ def calculate_summary_statistics(df: pd.DataFrame) -> Dict:
     order_counts = df["Order_NorwegianName"].value_counts().to_dict()
     stats["observations_per_order"] = order_counts
     
+    # Temporal analysis
+    temporal_stats = generate_temporal_summary(df, logger_file_path)
+    stats["temporal_analysis"] = temporal_stats
+    
     return stats
 
 
@@ -134,6 +140,13 @@ def print_summary_statistics(stats: Dict) -> None:
     # Total observations
     print(f"\nTotal observations: {stats.get('total_observations', 0)}")
     print(f"Unique species detected: {stats.get('unique_species_count', 0)}")
+    
+    # Recording analysis
+    if 'recording_analysis' in stats:
+        rec_analysis = stats['recording_analysis']
+        print(f"Recording duration: {rec_analysis['total_duration_minutes']} minutes ({rec_analysis['total_duration_seconds']} seconds)")
+        print(f"Detection density: {rec_analysis['detection_density_per_minute']} detections per minute")
+        print(f"Analysis period: {rec_analysis['first_detection_time']:.0f}s to {rec_analysis['last_detection_time']:.0f}s")
     
     # Confidence analysis (moved up to be more prominent)
     if 'confidence_overall' in stats:
@@ -212,17 +225,21 @@ def print_summary_statistics(stats: Dict) -> None:
             print(f"\nSpecies by average confidence (all species):")
             for species, conf_data in sorted_species:
                 print(f"  {species}: {conf_data['mean']} (range: {conf_data['min']}-{conf_data['max']}, n={conf_data['count']})")
-        
+    
+    # Temporal analysis section
+    if 'temporal_analysis' in stats:
+        print_temporal_analysis(stats['temporal_analysis'])
     
     print("\n" + "="*50)
 
 
-def generate_statistics_report(csv_path: Path) -> Dict:
+def generate_statistics_report(csv_path: Path, logger_file_path: str = None) -> Dict:
     """
     Generate and print summary statistics from the enriched detections CSV
     
     Args:
         csv_path: Path to the enriched detections CSV file
+        logger_file_path: Optional path to logger CSV file for real timestamp analysis
         
     Returns:
         Dictionary containing the calculated statistics
@@ -232,7 +249,7 @@ def generate_statistics_report(csv_path: Path) -> Dict:
         df = pd.read_csv(csv_path, sep=";")
         
         # Calculate statistics
-        stats = calculate_summary_statistics(df)
+        stats = calculate_summary_statistics(df, logger_file_path)
         
         # Print statistics to console
         print_summary_statistics(stats)

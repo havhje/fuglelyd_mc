@@ -211,7 +211,8 @@ def run_full_analysis(
     birdnet_lon: float = 15.4244,
     birdnet_lat: float = 68.5968,
     birdnet_date: datetime = None,
-    birdnet_min_conf: float = 0.5
+    birdnet_min_conf: float = 0.5,
+    logger_file_path: str = None
 ):
     """
     Runs the complete bird sound analysis pipeline.
@@ -225,6 +226,7 @@ def run_full_analysis(
         birdnet_lat: Latitude for BirdNET analysis 
         birdnet_date: Date for seasonal adjustments in BirdNET
         birdnet_min_conf: Minimum confidence threshold for BirdNET detections
+        logger_file_path: Optional path to logger CSV file for real timestamp analysis
     """
     # Construct specific output paths
     output_csv_path = output_parent_dir_path / "interim" / "enriched_detections.csv"
@@ -293,7 +295,7 @@ def run_full_analysis(
         
     # Generate and print summary statistics
     logging.info("Generating summary statistics...")
-    generate_statistics_report(output_csv_path)
+    generate_statistics_report(output_csv_path, logger_file_path)
 
 
 if __name__ == "__main__":
@@ -339,6 +341,9 @@ if __name__ == "__main__":
     parser.add_argument('--log_level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
                         default='INFO', help="Set the logging level")
     
+    parser.add_argument('--logger_file', type=str, default=None,
+                        help="Path to logger CSV file for real timestamp analysis (optional)")
+    
     # Parse arguments
     args = parser.parse_args()
     
@@ -374,5 +379,6 @@ if __name__ == "__main__":
         birdnet_lon=args.lon,
         birdnet_lat=args.lat,
         birdnet_date=analysis_date,
-        birdnet_min_conf=args.min_conf
+        birdnet_min_conf=args.min_conf,
+        logger_file_path=args.logger_file
     )

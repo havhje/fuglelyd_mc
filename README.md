@@ -149,6 +149,7 @@ You have now completed the one-time setup!
 
 1.  **Make sure you have audio files ready:**
     *   Place the audio files you want to analyze (e.g., `.wav` or `.mp3` files) in a dedicated folder. For example, create a folder `C:\MyAudioRecordings`.
+    *   **IMPORTANT for Temporal Analysis:** For the program to perform detailed temporal analysis (showing when species are active throughout the day), your audio filenames must contain timestamps. See the "Audio File Naming for Temporal Analysis" section below for details.
 
 2.  **Open Command Prompt:**
     *   Press **Windows key + R**, type `cmd`, press Enter.
@@ -193,6 +194,86 @@ You have now completed the one-time setup!
         deactivate
         ```
     *   The `(tf_venv)` will then disappear from the start of the line.
+
+## Audio File Naming for Temporal Analysis
+
+The program includes advanced temporal analysis features that show when different bird species are most active throughout the day. **For this to work, your audio filenames must contain timestamp information.**
+
+### Supported Timestamp Formats
+
+The program automatically detects timestamps in various filename formats:
+
+#### **Format 1: YYYYMMDD_HHMMSS (Recommended)**
+```
+recorder_20240521_190002.wav
+2MA06968_20240521_190002.wav
+birdsong_20240521_190002_extra_info.wav
+```
+- **YYYYMMDD**: Year, month, day (e.g., `20240521` = May 21, 2024)
+- **HHMMSS**: Hour, minute, second in 24-hour format (e.g., `190002` = 19:00:02 = 7:00:02 PM)
+
+#### **Format 2: YYYY-MM-DD_HH-MM-SS**
+```
+recording_2024-05-21_19-00-02.wav
+fieldwork_2024-05-21_07-30-00.wav
+```
+
+#### **Format 3: ISO-like Format (YYYYMMDDTHHMMSS)**
+```
+audio_20240521T190002.wav
+sound_20240521T073000.wav
+```
+
+#### **Format 4: Underscore Separated (YYYY_MM_DD_HH_MM_SS)**
+```
+bird_2024_05_21_19_00_02.wav
+sound_2024_05_21_07_30_00.wav
+```
+
+#### **Format 5: All Dashes (YYYY-MM-DD-HH-MM-SS)**
+```
+recording-2024-05-21-19-00-02.wav
+```
+
+#### **Format 6: Unix Timestamp (10 digits)**
+```
+recording_1716310802.wav
+audio_1716310802_session1.wav
+```
+
+### Temporal Analysis Output
+
+When timestamps are successfully parsed from filenames, the program will show:
+
+- **Recording Sessions Overview**: How many recording sessions and time span covered
+- **Species Temporal Profiles**: For each species detected:
+  - **Peak activity window**: The 1-hour period with most detections (e.g., "05:00-06:00 (89 detections)")
+  - **Active period**: From first to last detection with total duration (e.g., "04:30-07:45 (3h 15m)")
+  - **Call pattern**: Calling behavior analysis (e.g., "Clustered (avg 2.3 min gaps, range: 0.5-8.2 min, std: 1.4 min)")
+- **Hourly Activity Distribution**: Visual bar chart showing bird activity by hour
+
+### Important Notes
+
+- **Timestamp must be in the filename**: The program extracts timestamps from the audio filename, not from file metadata
+- **24-hour format required**: Use 24-hour time format (e.g., `190002` for 7:00:02 PM)
+- **Consistent naming**: Use the same timestamp format for all files in a session
+- **No temporal analysis without timestamps**: If filenames don't contain recognizable timestamps, the program will still detect species but won't show temporal patterns
+
+### Example Output
+
+```
+SPECIES TEMPORAL PROFILES:
+
+tjeld:
+  Peak activity: 05:00-06:00 (89 detections)
+  Active period: 04:30-07:45 (3h 15m)
+  Call pattern: Clustered (avg 2.3 min gaps, range: 0.5-8.2 min, std: 1.4 min)
+
+fiskemåke:
+  Peak activity: 19:00-20:00 (12 detections)  
+  Active period: 19:36-20:15 (39m)
+  Call pattern: Regular (avg 8.2 min gaps, range: 2.1-15.3 min, std: 4.7 min)
+```
 
 ## Finding Your Latitude and Longitude
 
