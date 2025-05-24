@@ -138,7 +138,7 @@ Each time you start a new Python project, it's good practice to create a "virtua
 6.  **Install required Python packages:**
     *   Now, we'll install all the additional libraries (software packages) that the bird analysis program needs. Copy and paste (or type carefully) the following long command into Command Prompt:
         ```cmd
-        python -m pip install pandas birdnetlib requests tqdm pydub tensorflow librosa resampy
+        python -m pip install pandas tqdm pygwalker streamlit requests pydub tensorflow birdnetlib pyaudio librosa "resampy>=0.4.3" "seaborn>=0.13.2"
         ```
     *   Press Enter. This might take several minutes, as many files are downloaded and installed. You'll see a lot of text scrolling on the screen. Wait until it's finished and you see the `(tf_venv)` prompt again.
         *   *If you get error messages here, double-check that you installed Python 3.11 (not a different version) and that you activated the virtual environment `(tf_venv)` correctly.*
@@ -349,6 +349,10 @@ The program will create the following in the folder you specified for `--output_
 2.  **Split Audio Segments:**
     *   Path: `YOUR_OUTPUT_FOLDER\lydfiler\`
     *   Description: This directory will contain subfolders for each detected species (named with the Norwegian common name, e.g., "European Robin" if the species is "Erithacus rubecula" and a Norwegian name is found). Inside each species folder, you'll find the individual audio segments (.wav files) corresponding to the detections for that species. File names for segments will typically include the original audio file name, start/end times, and the species name for easy identification.
+
+3.  **Joy Division Activity Plot (PNG Image):**
+    *   Path: `YOUR_OUTPUT_FOLDER\figur\bird_detection_joy_division_plot.png`
+    *   Description: A PNG image visualizing the daily activity patterns of detected bird species in a **Joy Division style ridgeline plot**. Each species is represented by a "ridge" (a density plot) showing its detection frequency throughout a 24-hour cycle. The ridges are sorted by their earliest peak activity time. The fill color of each ridge indicates the average detection confidence for that species (typically, darker/more purple means higher confidence, and lighter/yellower means lower confidence, with a color bar provided for reference). The plot title and annotations provide further details, including a note about the minimum number of detections required for a species to be included (default is 5).
 
 ## Important Notes
 
