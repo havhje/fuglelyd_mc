@@ -16,4 +16,5 @@ dependencies = [
     "birdnetlib",
     "pyaudio",
     "librosa",
+    "resampy>=0.4.3",
 ]
