@@ -1,6 +1,7 @@
 import pathlib
 import joypy
 import pandas as pd
+import numpy as np
 from matplotlib import pyplot as plt
 from functions.temporal_analysis import add_real_timestamps
 
@@ -43,6 +44,12 @@ df_filtered = df[df["Species_NorwegianName"].isin(species_to_keep)].copy()
 df_filtered["hour_of_day_transformed"] = (df_filtered["hour_of_day"] - 12) % 24
 
 # ---------------------------------------
+# Calculate confidence statistics for coloring
+# ---------------------------------------
+
+confidence_stats = df_filtered.groupby("Species_NorwegianName")["confidence"].mean()
+
+# ---------------------------------------
 # Sorter peaks etter tidspunkt (using transformed coordinates)
 # ---------------------------------------
 
@@ -59,6 +66,26 @@ df_filtered["Species_NorwegianName"] = pd.Categorical(
 df_filtered = df_filtered.sort_values("Species_NorwegianName")
 
 # ---------------------------------------
+# Setup colormap for confidence-based coloring
+# ---------------------------------------
+
+# Get confidence values for sorted species
+sorted_confidences = [confidence_stats[species] for species in sorted_species_list]
+conf_min, conf_max = min(sorted_confidences), max(sorted_confidences)
+
+# Avoid division by zero if all confidences are the same
+if conf_max - conf_min < 0.01:
+    conf_min -= 0.05
+    conf_max += 0.05
+
+# Create colormap (same as joy_division_plot)
+norm = plt.Normalize(vmin=conf_min, vmax=conf_max)
+cmap = plt.cm.plasma_r  # Inverted plasma colormap
+
+# Create colors for each species
+colors = [cmap(norm(conf)) for conf in sorted_confidences]
+
+# ---------------------------------------
 # Plotter (using transformed coordinates)
 # ---------------------------------------
 
@@ -72,8 +99,26 @@ fig, ax = joypy.joyplot(
     fade=True,
 )
 
+# Apply confidence-based colors manually to each subplot
+for i, (species, color) in enumerate(zip(sorted_species_list, colors)):
+    if isinstance(ax, list):
+        current_ax = ax[i]
+    else:
+        current_ax = ax
+
+    # Get all patches (filled areas) for this subplot and color them
+    for patch in current_ax.collections:
+        patch.set_facecolor(color)
+        patch.set_alpha(0.7)
+
 # Customize the x-axis for noon-to-noon display
 plt.xlabel("Hour of Day")
 plt.xticks(ticks=[0, 6, 12, 18, 24], labels=["12:00", "18:00", "00:00", "06:00", "12:00"])
+
+# Add colorbar for confidence
+sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+sm.set_array([])
+cbar = plt.colorbar(sm, ax=ax, shrink=0.8, aspect=20)
+cbar.set_label("Average Confidence", rotation=270, labelpad=15, fontweight="bold")
 
 plt.show()
