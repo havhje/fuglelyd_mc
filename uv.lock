@@ -524,6 +524,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "birdnetlib" },
     { name = "ffmpeg" },
+    { name = "joypy" },
     { name = "librosa" },
     { name = "pandas" },
     { name = "pyaudio" },
@@ -531,6 +532,7 @@ dependencies = [
     { name = "pygwalker" },
     { name = "requests" },
     { name = "resampy" },
+    { name = "scipy" },
     { name = "seaborn" },
     { name = "streamlit" },
     { name = "tensorflow" },
@@ -541,6 +543,7 @@ dependencies = [
 requires-dist = [
     { name = "birdnetlib" },
     { name = "ffmpeg" },
+    { name = "joypy", specifier = ">=0.2.6" },
     { name = "librosa" },
     { name = "pandas" },
     { name = "pyaudio" },
@@ -548,6 +551,7 @@ requires-dist = [
     { name = "pygwalker" },
     { name = "requests" },
     { name = "resampy", specifier = ">=0.4.3" },
+    { name = "scipy", specifier = ">=1.15.3" },
     { name = "seaborn", specifier = ">=0.13.2" },
     { name = "streamlit" },
     { name = "tensorflow" },
@@ -829,6 +833,21 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/30/08/8bd4a0250247861420a040b33ccf42f43c426ac91d99405374ef117e5872/joblib-1.5.0.tar.gz", hash = "sha256:d8757f955389a3dd7a23152e43bc297c2e0c2d3060056dad0feefc88a06939b5", size = 330234 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/da/d3/13ee227a148af1c693654932b8b0b02ed64af5e1f7406d56b088b57574cd/joblib-1.5.0-py3-none-any.whl", hash = "sha256:206144b320246485b712fc8cc51f017de58225fa8b414a1fe1764a7231aca491", size = 307682 },
+]
+
+[[package]]
+name = "joypy"
+version = "0.2.6"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "matplotlib" },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "scipy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/89/f4/49636d4c5fa30822028a1e2af234cecf488ba3c7e9ff5aba88e36fb0c95c/joypy-0.2.6.tar.gz", hash = "sha256:099da2d6c7d81b5eccc957bd9446831f565ba42d5abbab0fa92b81892449522e", size = 10270 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e9/8c/4d32c8935431eb10fd140faa4b13b6b8de222223a88fa9ad2a7711b7f1a9/joypy-0.2.6-py2.py3-none-any.whl", hash = "sha256:fffe882e8281e56e08b374a3148436cb448562ba39e4d566204c7e8ee2caddab", size = 8584 },
 ]
 
 [[package]]

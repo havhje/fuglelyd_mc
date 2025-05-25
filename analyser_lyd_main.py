@@ -5,6 +5,7 @@ import multiprocessing
 import argparse
 import sys
 import logging
+import shutil
 from datetime import datetime, date
 from tqdm import tqdm
 
@@ -18,6 +19,31 @@ from utils import setup_ffmpeg
 # ----------------------------------------
 # Function implementations
 # ----------------------------------------
+
+
+def clean_output_directories(output_parent_dir_path: Path) -> None:
+    """Clean all output directories to ensure fresh results from each run."""
+    directories_to_clean = ["figur", "interim", "lydfiler"]
+
+    logging.info("Cleaning output directories for fresh results...")
+
+    for dir_name in directories_to_clean:
+        dir_path = output_parent_dir_path / dir_name
+        if dir_path.exists():
+            try:
+                shutil.rmtree(dir_path)
+                logging.info(f"  - Cleaned directory: {dir_path}")
+            except Exception as e:
+                logging.warning(f"  - Failed to clean directory {dir_path}: {e}")
+
+        # Recreate the empty directory
+        try:
+            dir_path.mkdir(parents=True, exist_ok=True)
+            logging.info(f"  - Recreated directory: {dir_path}")
+        except Exception as e:
+            logging.error(f"  - Failed to recreate directory {dir_path}: {e}")
+
+    logging.info("Directory cleaning completed.")
 
 
 def initialize_dataframe(detections_list: list) -> pd.DataFrame | None:
@@ -230,14 +256,12 @@ def run_full_analysis(
         birdnet_min_conf: Minimum confidence threshold for BirdNET detections
         logger_file_path: Optional path to logger CSV file for real timestamp analysis
     """
+    # Clean output directories for fresh results
+    clean_output_directories(output_parent_dir_path)
+
     # Construct specific output paths
     output_csv_path = output_parent_dir_path / "interim" / "enriched_detections.csv"
     split_audio_output_dir = output_parent_dir_path / "lydfiler"
-
-    # Ensure output directories exist
-    output_csv_path.parent.mkdir(parents=True, exist_ok=True)
-    if run_audio_splitting:
-        split_audio_output_dir.mkdir(parents=True, exist_ok=True)
 
     # Use current date if none specified
     if birdnet_date is None:
@@ -289,7 +313,6 @@ def run_full_analysis(
             plot_df = load_detection_data(output_csv_path)
             if not plot_df.empty:
                 plot_output_dir = output_parent_dir_path / "figur"
-                plot_output_dir.mkdir(parents=True, exist_ok=True)
                 plot_output_path = plot_output_dir / "bird_detection_joy_division_plot.png"
                 logging.info(f"Generating Joy Division plot, will be saved to: {plot_output_path}")
                 create_joy_division_plot(df=plot_df, output_path=plot_output_path)

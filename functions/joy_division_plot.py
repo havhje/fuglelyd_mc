@@ -229,21 +229,32 @@ def create_joy_division_plot(
         hours = stats["hours"]
         avg_conf = stats["avg_confidence"]
 
+        # Transform hours for 12 PM to 12 PM plot
+        # 0 (orig midnight) -> 12 (plot midnight)
+        # 6 (orig 6 AM)    -> 18 (plot 6 AM)
+        # 12 (orig noon)   -> 0 (plot noon) or 24 (plot next noon)
+        # 18 (orig 6 PM)   -> 6 (plot 6 PM)
+        transformed_hours = np.array([h - 12 if h >= 12 else h + 12 for h in hours])
+
         try:
             # Create KDE for smooth curve
-            if len(hours) > 1:
-                kde = gaussian_kde(hours)
+            if len(transformed_hours) > 1:
+                kde = gaussian_kde(transformed_hours)
                 kde.set_bandwidth(kde.factor * 0.8)  # Slightly smoother
                 density = kde(x_range)
             else:
                 # Fallback for single detection
                 density = np.zeros_like(x_range)
-                closest_idx = np.argmin(np.abs(x_range - hours[0]))
-                density[closest_idx] = 1.0
+                if transformed_hours:  # Check if list is not empty
+                    closest_idx = np.argmin(np.abs(x_range - transformed_hours[0]))
+                    density[closest_idx] = 1.0
+                else:  # If no detections after filtering, density remains zero
+                    density = np.zeros_like(x_range)
 
         except Exception as e:
             logger.warning(f"KDE failed for {species}: {e}. Using histogram fallback.")
-            hist, bins = np.histogram(hours, bins=50, range=(0, 24), density=True)
+            # Ensure histogram also uses transformed hours if KDE fails
+            hist, bins = np.histogram(transformed_hours, bins=50, range=(0, 24), density=True)
             x_centers = (bins[:-1] + bins[1:]) / 2
             density = np.interp(x_range, x_centers, hist)
 
@@ -276,12 +287,14 @@ def create_joy_division_plot(
             ax.set_xticks([])
 
     # Configure overall plot
-    plt.subplots_adjust(hspace=-0.4, left=0.2)  # Added left margin for labels
+    plt.subplots_adjust(hspace=-0.4, left=0.2)
 
     # Set up bottom axis
     axes[-1].set_xlabel("Hour of Day", fontsize=12, fontweight="bold")
+    # New x-axis ticks and labels for 12 PM to 12 PM
     axes[-1].set_xticks([0, 6, 12, 18, 24])
-    axes[-1].set_xticklabels(["0", "6", "12", "18", "24"])
+    axes[-1].set_xticklabels(["12 PM", "6 PM", "Midnight", "6 AM", "12 PM"])
+    axes[-1].tick_params(axis="x", labelsize=10)
 
     # Add title and subtitle
     fig.suptitle("Bird Detection Patterns by Time of Day", fontsize=16, fontweight="bold", y=0.98)
