@@ -36,10 +36,17 @@ df_filtered = df[df["Species_NorwegianName"].isin(species_to_keep)].copy()
 
 
 # ---------------------------------------
-# Sorter peaks etter tidspunkt
+# Transform to noon-to-noon display (like joy_division_plot)
 # ---------------------------------------
 
-peak_times = df_filtered.groupby("Species_NorwegianName")["hour_of_day"].mean().sort_values()
+# Transform hours: 12 PM (noon) -> 0, midnight -> 12, etc.
+df_filtered["hour_of_day_transformed"] = (df_filtered["hour_of_day"] - 12) % 24
+
+# ---------------------------------------
+# Sorter peaks etter tidspunkt (using transformed coordinates)
+# ---------------------------------------
+
+peak_times = df_filtered.groupby("Species_NorwegianName")["hour_of_day_transformed"].mean().sort_values()
 sorted_species_list = peak_times.index.tolist()
 
 # ---------------------------------------
@@ -52,21 +59,21 @@ df_filtered["Species_NorwegianName"] = pd.Categorical(
 df_filtered = df_filtered.sort_values("Species_NorwegianName")
 
 # ---------------------------------------
-# Plotter
+# Plotter (using transformed coordinates)
 # ---------------------------------------
 
 fig, ax = joypy.joyplot(
     df_filtered,  # Use the filtered DataFrame
     by="Species_NorwegianName",
-    column="hour_of_day",
+    column="hour_of_day_transformed",  # Use transformed coordinates
     figsize=(10, 5),
     x_range=[0, 24],
     linewidth=0.5,
     fade=True,
 )
 
-# Customize the x-axis
+# Customize the x-axis for noon-to-noon display
 plt.xlabel("Hour of Day")
-plt.xticks(ticks=[0, 6, 12, 18, 24], labels=["00:00", "06:00", "12:00", "18:00", "24:00"])
+plt.xticks(ticks=[0, 6, 12, 18, 24], labels=["12:00", "18:00", "00:00", "06:00", "12:00"])
 
 plt.show()

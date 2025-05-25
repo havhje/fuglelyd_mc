@@ -223,44 +223,71 @@ def create_joy_division_plot(
     # Create ridgelines
     x_range = np.linspace(0, 24, 1000)
 
+    # Calculate scaling factors based on detection counts
+    all_detection_counts = [species_stats[sp]["n_detections"] for sp in sorted_species]
+    max_detections = max(all_detection_counts)
+
     for i, species in enumerate(sorted_species):
         ax = axes[i]
         stats = species_stats[species]
         hours = stats["hours"]
         avg_conf = stats["avg_confidence"]
+        n_detections = stats["n_detections"]
 
-        # Transform hours for 12 PM to 12 PM plot
-        # 0 (orig midnight) -> 12 (plot midnight)
-        # 6 (orig 6 AM)    -> 18 (plot 6 AM)
-        # 12 (orig noon)   -> 0 (plot noon) or 24 (plot next noon)
-        # 18 (orig 6 PM)   -> 6 (plot 6 PM)
-        transformed_hours = np.array([h - 12 if h >= 12 else h + 12 for h in hours])
+        # Transform hours for 12 PM to 12 PM plot (noon to noon)
+        # We want: 12 PM (noon) at x=0, midnight at x=12, 12 PM (next noon) at x=24
+        # Original hours: 0=midnight, 6=6AM, 12=noon, 18=6PM
+        # Transformed: 12=noon->0, 18=6PM->6, 0=midnight->12, 6=6AM->18
+        transformed_hours = np.array([(h - 12) % 24 for h in hours])
 
         try:
-            # Create KDE for smooth curve
+            # Handle circular time by duplicating data at boundaries for better KDE
             if len(transformed_hours) > 1:
-                kde = gaussian_kde(transformed_hours)
+                # Add boundary handling for circular time
+                extended_hours = list(transformed_hours)
+
+                # Add points near 0 boundary (if we have points near 24)
+                near_24 = transformed_hours[transformed_hours > 22]
+                if len(near_24) > 0:
+                    extended_hours.extend(near_24 - 24)  # Wrap to negative side
+
+                # Add points near 24 boundary (if we have points near 0)
+                near_0 = transformed_hours[transformed_hours < 2]
+                if len(near_0) > 0:
+                    extended_hours.extend(near_0 + 24)  # Wrap to positive side
+
+                extended_hours = np.array(extended_hours)
+
+                # Create KDE with extended data
+                kde = gaussian_kde(extended_hours)
                 kde.set_bandwidth(kde.factor * 0.8)  # Slightly smoother
+
+                # Evaluate KDE only on the main range [0, 24]
                 density = kde(x_range)
+
+                # Ensure no negative densities
+                density = np.maximum(density, 0)
             else:
                 # Fallback for single detection
                 density = np.zeros_like(x_range)
-                if transformed_hours:  # Check if list is not empty
+                if len(transformed_hours) > 0:
                     closest_idx = np.argmin(np.abs(x_range - transformed_hours[0]))
                     density[closest_idx] = 1.0
-                else:  # If no detections after filtering, density remains zero
-                    density = np.zeros_like(x_range)
 
         except Exception as e:
             logger.warning(f"KDE failed for {species}: {e}. Using histogram fallback.")
-            # Ensure histogram also uses transformed hours if KDE fails
+            # Histogram fallback with proper circular handling
             hist, bins = np.histogram(transformed_hours, bins=50, range=(0, 24), density=True)
             x_centers = (bins[:-1] + bins[1:]) / 2
             density = np.interp(x_range, x_centers, hist)
 
-        # Normalize density to 0-1 range
+        # Scale density proportionally to detection count
         if density.max() > 0:
+            # Normalize to 0-1 first, then scale by detection count proportion
             density = density / density.max()
+            # Scale by square root to avoid extreme differences while preserving relative importance
+            detection_scale = np.sqrt(n_detections / max_detections)
+            density = density * detection_scale
 
         # Color based on average confidence
         color = cmap(norm(avg_conf))
@@ -279,8 +306,11 @@ def create_joy_division_plot(
         ax.spines["left"].set_visible(False)
         ax.patch.set_alpha(0)
 
-        # Add species label
-        ax.text(-0.01, 0.1, species, transform=ax.transAxes, fontsize=10, fontweight="bold", va="bottom", ha="right")
+        # Add species label with detection count
+        species_label = f"{species} (n={n_detections})"
+        ax.text(
+            -0.01, 0.1, species_label, transform=ax.transAxes, fontsize=10, fontweight="bold", va="bottom", ha="right"
+        )
 
         # Only show x-axis on bottom plot
         if i < n_species - 1:
@@ -291,7 +321,7 @@ def create_joy_division_plot(
 
     # Set up bottom axis
     axes[-1].set_xlabel("Hour of Day", fontsize=12, fontweight="bold")
-    # New x-axis ticks and labels for 12 PM to 12 PM
+    # X-axis ticks and labels for noon-to-noon display (transformed coordinates)
     axes[-1].set_xticks([0, 6, 12, 18, 24])
     axes[-1].set_xticklabels(["12 PM", "6 PM", "Midnight", "6 AM", "12 PM"])
     axes[-1].tick_params(axis="x", labelsize=10)
@@ -299,7 +329,12 @@ def create_joy_division_plot(
     # Add title and subtitle
     fig.suptitle("Bird Detection Patterns by Time of Day", fontsize=16, fontweight="bold", y=0.98)
     fig.text(
-        0.5, 0.95, "Ridges sorted by earliest peak; Fill = Avg Confidence", ha="center", fontsize=12, style="italic"
+        0.5,
+        0.95,
+        "Ridges sorted by earliest peak; Height ∝ √(detection count); Fill = Avg Confidence",
+        ha="center",
+        fontsize=12,
+        style="italic",
     )
     fig.text(
         0.5,
@@ -325,7 +360,7 @@ def create_joy_division_plot(
     fig.text(
         0.5,
         0.01,  # x=center, y=bottom
-        "Each ridge shows activity pattern via Kernel Density Estimation (KDE) of detection times; heights normalized per species.",
+        "Each ridge shows activity pattern via KDE of detection times; heights scaled by √(detection count). Time axis: noon-to-noon.",
         ha="center",
         va="bottom",
         fontsize=8,
