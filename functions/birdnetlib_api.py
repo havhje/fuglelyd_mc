@@ -24,11 +24,10 @@ def on_analyze_directory_complete(recordings, base_input_path):
     return all_detections
 
 
-def run_birdnet_analysis(directory_to_analyze, callback_func_from_main, lon=15.4244, lat=68.5968, 
-                         analysis_date=None, min_confidence=0.5):
+def run_birdnet_analysis(directory_to_analyze, callback_func_from_main, lon=7.0070, lat=59.4451, analysis_date=None, min_confidence=0.01):
     """
     Run BirdNET analysis on audio files in the specified directory.
-    
+
     Args:
         directory_to_analyze: Path to directory with audio files
         callback_func_from_main: Callback function to process detections
@@ -36,7 +35,7 @@ def run_birdnet_analysis(directory_to_analyze, callback_func_from_main, lon=15.4
         lat: Latitude for analysis location
         analysis_date: Date of recording for seasonal adjustments (datetime object)
         min_confidence: Minimum confidence threshold for detections (0.0-1.0)
-    
+
     Returns:
         List of detection dictionaries
     """
@@ -78,9 +77,6 @@ def run_birdnet_analysis(directory_to_analyze, callback_func_from_main, lon=15.4
     batch.process()  # Triggers analysis_complete_wrapper
     logging.info("Batch processing finished.")
 
-    log_msg = (
-        f"Returning {len(detections_container)} detections "
-        f"from run_birdnet_analysis."
-    )
+    log_msg = f"Returning {len(detections_container)} detections from run_birdnet_analysis."
     logging.info(log_msg)
     return detections_container  # Return the populated list

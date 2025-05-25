@@ -138,7 +138,7 @@ Each time you start a new Python project, it's good practice to create a "virtua
 6.  **Install required Python packages:**
     *   Now, we'll install all the additional libraries (software packages) that the bird analysis program needs. Copy and paste (or type carefully) the following long command into Command Prompt:
         ```cmd
-        python -m pip install pandas tqdm pygwalker streamlit requests pydub tensorflow birdnetlib pyaudio librosa "resampy>=0.4.3" "seaborn>=0.13.2"
+        python -m pip install pandas tqdm pygwalker streamlit requests pydub tensorflow ffmpeg birdnetlib pyaudio librosa "resampy>=0.4.3" "seaborn>=0.13.2" "joypy>=0.2.6" "scipy>=1.15.3"
         ```
     *   Press Enter. This might take several minutes, as many files are downloaded and installed. You'll see a lot of text scrolling on the screen. Wait until it's finished and you see the `(tf_venv)` prompt again.
         *   *If you get error messages here, double-check that you installed Python 3.11 (not a different version) and that you activated the virtual environment `(tf_venv)` correctly.*
