@@ -13,7 +13,7 @@ from functions.birdnetlib_api import run_birdnet_analysis, on_analyze_directory_
 from functions.artskart_api import fetch_artskart_taxon_info_by_name
 from functions.splitter_lydfilen import split_audio_by_detection
 from functions.statistics import generate_statistics_report
-from functions.joy_division_plot import create_joy_division_plot, load_detection_data
+from functions.joy2_tester import create_joypy_plot
 from utils import setup_ffmpeg
 
 # ----------------------------------------
@@ -307,20 +307,19 @@ def run_full_analysis(
         detections_df.to_csv(output_csv_path, index=False, sep=";")
         logging.info(f"Enriched detections saved to: {output_csv_path}")
 
-        # Generate Joy Division Plot
+        # Generate Joypy Plot
         try:
-            logging.info(f"Attempting to load data for Joy Division plot from: {output_csv_path}")
-            plot_df = load_detection_data(output_csv_path)
-            if not plot_df.empty:
+            logging.info("Generating Joypy ridgeline plot...")
+            if not detections_df.empty:
                 plot_output_dir = output_parent_dir_path / "figur"
-                plot_output_path = plot_output_dir / "bird_detection_joy_division_plot.png"
-                logging.info(f"Generating Joy Division plot, will be saved to: {plot_output_path}")
-                create_joy_division_plot(df=plot_df, output_path=plot_output_path)
-                logging.info(f"Joy Division plot generated successfully: {plot_output_path}")
+                joypy_output_path = plot_output_dir / "bird_detection_joypy_plot.png"
+                logging.info(f"Joypy plot will be saved to: {joypy_output_path}")
+                create_joypy_plot(df=detections_df, output_path=joypy_output_path)
+                logging.info(f"Joypy plot generated successfully: {joypy_output_path}")
             else:
-                logging.warning("DataFrame for Joy Division plot is empty. Skipping plot generation.")
+                logging.warning("DataFrame for Joypy plot is empty. Skipping plot generation.")
         except Exception as e:
-            logging.error(f"Error generating Joy Division plot: {e}", exc_info=True)
+            logging.error(f"Error generating Joypy plot: {e}", exc_info=True)
 
     except Exception as e:
         logging.error(f"Failed to save enriched detections to CSV: {e}", exc_info=True)
