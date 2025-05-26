@@ -6,7 +6,7 @@ import argparse
 import sys
 import logging
 import shutil
-from datetime import datetime, date
+from datetime import datetime
 from tqdm import tqdm
 
 from functions.birdnetlib_api import (
@@ -18,6 +18,10 @@ from functions.splitter_lydfilen import split_audio_by_detection
 from functions.statistics import generate_statistics_report
 from functions.joy2_tester import create_joypy_plot
 from utils import setup_ffmpeg
+
+# Define the default custom species list path (primarily for reference and help text)
+# The actual path construction logic is in birdnetlib_api.py
+DEFAULT_PROJECT_SPECIES_LIST_PATH_STR = "data_input_artsliste/arter.txt"
 
 # ----------------------------------------
 # Function implementations
@@ -290,7 +294,7 @@ def run_full_analysis(
     birdnet_date: datetime = None,
     birdnet_min_conf: float = 0.5,
     logger_file_path: str = None,
-    custom_species_list_path: str = None,
+    custom_species_list_param_for_birdnet: str | bool | None = None,
 ):
     """
     Runs the complete bird sound analysis pipeline.
@@ -305,7 +309,8 @@ def run_full_analysis(
         birdnet_date: Date for seasonal adjustments in BirdNET (ignored if custom_species_list_path is provided)
         birdnet_min_conf: Minimum confidence threshold for BirdNET detections
         logger_file_path: Optional path to logger CSV file for real timestamp analysis
-        custom_species_list_path: Optional path to custom species list file
+        custom_species_list_param_for_birdnet: Path to a user-defined custom species list,
+                                               True to use default project list, or None for location-based.
     """
     # Clean output directories for fresh results
     clean_output_directories(output_parent_dir_path)
@@ -324,15 +329,25 @@ def run_full_analysis(
     logging.info(f"  - Input directory: {input_dir_path}")
     logging.info(f"  - Output directory: {output_parent_dir_path}")
 
-    if custom_species_list_path:
-        logging.info(f"  - Custom species list: {custom_species_list_path}")
+    # Logic for logging based on how species list is determined
+    if isinstance(custom_species_list_param_for_birdnet, str):
         logging.info(
-            f"  - Analysis mode: Custom species list (location parameters ignored)"
+            f"  - Custom species list (user-provided): {custom_species_list_param_for_birdnet}"
         )
-    else:
+        logging.info(
+            "  - Analysis mode: User-defined custom species list (location parameters ignored)"
+        )
+    elif custom_species_list_param_for_birdnet is True:
+        logging.info(
+            f"  - Custom species list (project default): {DEFAULT_PROJECT_SPECIES_LIST_PATH_STR}"
+        )
+        logging.info(
+            "  - Analysis mode: Project default custom species list (location parameters ignored)"
+        )
+    else:  # None or False
         logging.info(f"  - Location: {birdnet_lat}°N, {birdnet_lon}°E")
         logging.info(f"  - Analysis date: {birdnet_date.strftime('%Y-%m-%d')}")
-        logging.info(f"  - Analysis mode: Location-based")
+        logging.info("  - Analysis mode: Location-based")
 
     logging.info(f"  - Min confidence: {birdnet_min_conf}")
     logging.info(
@@ -359,7 +374,7 @@ def run_full_analysis(
         lat=birdnet_lat,
         analysis_date=birdnet_date,
         min_confidence=birdnet_min_conf,
-        custom_species_list_path=custom_species_list_path,
+        custom_species_list_path=custom_species_list_param_for_birdnet,
     )
 
     # Initialize DataFrame from detections
@@ -521,11 +536,18 @@ if __name__ == "__main__":
         help="Path to logger CSV file for real timestamp analysis (optional)",
     )
 
-    parser.add_argument(
+    # Custom species list arguments
+    custom_list_group = parser.add_mutually_exclusive_group()
+    custom_list_group.add_argument(
         "--custom_species_list",
         type=str,
         default=None,
-        help="Path to custom species list file (optional)",
+        help="Path to a user-provided custom species list file (e.g., your_list.txt). Ignores lat/lon/date.",
+    )
+    custom_list_group.add_argument(
+        "--use_default_species_list",
+        action="store_true",
+        help=f"Use the project's default species list ({DEFAULT_PROJECT_SPECIES_LIST_PATH_STR}). Ignores lat/lon/date.",
     )
 
     # Parse arguments
@@ -534,26 +556,42 @@ if __name__ == "__main__":
     # Set logging level based on argument
     logging.getLogger().setLevel(getattr(logging, args.log_level))
 
-    # Validate parameter combinations
+    # Determine birdnet_custom_species_list_param for run_birdnet_analysis
+    birdnet_custom_species_list_param: str | bool | None = None
     if args.custom_species_list:
-        # When using custom species list, location parameters are not needed
+        birdnet_custom_species_list_param = args.custom_species_list
         logging.info(
-            "Custom species list provided - location parameters will be ignored"
+            f"Using user-provided custom species list: {args.custom_species_list}. Location parameters will be ignored."
         )
-        analysis_date = datetime.now()  # Use current date as default
+    elif args.use_default_species_list:
+        birdnet_custom_species_list_param = (
+            True  # Signal to use default hardcoded path in birdnetlib_api
+        )
+        logging.info(
+            f"Using project default custom species list ({DEFAULT_PROJECT_SPECIES_LIST_PATH_STR}). Location parameters will be ignored."
+        )
     else:
-        # Standard location-based analysis requires location parameters
+        # Location-based analysis: lat, lon, and date are required
         if not all([args.lat, args.lon, args.date]):
             logging.error(
-                "Location-based analysis requires --lat, --lon, and --date parameters"
+                "For location-based analysis (default), --lat, --lon, and --date parameters are required. "
+                "Alternatively, provide --custom_species_list PATH or --use_default_species_list."
             )
             sys.exit(1)
+        logging.info("Using location-based species analysis.")
 
-        # Process and validate date
+    # Process and validate date if location-based analysis is chosen
+    analysis_date = datetime.now()  # Default, might be overwritten
+    if birdnet_custom_species_list_param is None:  # i.e. location-based
         try:
             analysis_date = datetime.strptime(args.date, "%Y-%m-%d")
         except ValueError:
-            logging.error("Invalid date format. Please use YYYY-MM-DD.")
+            logging.error(
+                "Invalid date format for --date. Please use YYYY-MM-DD."
+            )
+            sys.exit(1)
+        except TypeError:  # Handles if args.date is None (already checked by 'all' but good for safety)
+            logging.error("--date is required for location-based analysis.")
             sys.exit(1)
 
     # Validate min_conf (0.0 to 1.0)
@@ -577,10 +615,10 @@ if __name__ == "__main__":
         output_parent_dir_path=Path(args.output_dir),
         run_audio_splitting=run_audio_splitting,
         max_segments_per_species=args.max_segments,
-        birdnet_lon=args.lon or 15.4244,  # Use default if None
-        birdnet_lat=args.lat or 68.5968,  # Use default if None
-        birdnet_date=analysis_date,
+        birdnet_lon=args.lon,  # Pass through, might be None if custom list used
+        birdnet_lat=args.lat,  # Pass through, might be None
+        birdnet_date=analysis_date,  # Correctly scoped and validated/defaulted
         birdnet_min_conf=args.min_conf,
         logger_file_path=args.logger_file,
-        custom_species_list_path=args.custom_species_list,
+        custom_species_list_param_for_birdnet=birdnet_custom_species_list_param,
     )

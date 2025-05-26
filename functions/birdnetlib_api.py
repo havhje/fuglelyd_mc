@@ -4,6 +4,14 @@ from datetime import datetime
 from pathlib import Path
 import logging
 
+# Define the default custom species list path relative to this file
+# Assumes this script is in 'functions/' and 'data_input_artsliste/' is in the parent directory.
+DEFAULT_CUSTOM_SPECIES_LIST_PATH = (
+    Path(__file__).resolve().parent.parent
+    / "data_input_artsliste"
+    / "arter.txt"
+)
+
 
 def on_analyze_directory_complete(recordings, base_input_path):
     all_detections = []  # Initialize an empty list to store all detections
@@ -31,7 +39,7 @@ def run_birdnet_analysis(
     lat=59.4451,
     analysis_date=None,
     min_confidence=0.01,
-    custom_species_list_path=None,
+    custom_species_list_path: str | bool | None = None,
 ):
     """
     Run BirdNET analysis on audio files in the specified directory.
@@ -75,24 +83,39 @@ def run_birdnet_analysis(
         else:  # Empty list
             logging.info("User callback returned an empty list of detections.")
 
-    # Handle custom species list vs location-based analysis
-    if custom_species_list_path:
-        # Validate custom species list file exists
-        species_list_path = Path(custom_species_list_path)
-        if not species_list_path.exists():
+    # Determine actual species list path to use
+    species_list_to_use = None
+    use_custom_list_logic = False
+
+    if isinstance(custom_species_list_path, str):
+        # User provided a specific path
+        species_list_to_use = Path(custom_species_list_path)
+        if not species_list_to_use.is_file():
             raise FileNotFoundError(
                 f"Custom species list file not found: {custom_species_list_path}"
             )
+        logging.info(
+            f"Using user-defined custom species list: {species_list_to_use}"
+        )
+        use_custom_list_logic = True
+    elif custom_species_list_path is True:
+        # User wants to use the default hardcoded custom species list
+        if not DEFAULT_CUSTOM_SPECIES_LIST_PATH.is_file():
+            raise FileNotFoundError(
+                f"Default custom species list file not found: {DEFAULT_CUSTOM_SPECIES_LIST_PATH}"
+            )
+        species_list_to_use = DEFAULT_CUSTOM_SPECIES_LIST_PATH
+        logging.info(
+            f"Using default project custom species list: {species_list_to_use}"
+        )
+        use_custom_list_logic = True
+    # If custom_species_list_path is None or False, species_list_to_use remains None, and use_custom_list_logic is False
 
-        logging.info(f"Using custom species list: {custom_species_list_path}")
+    if use_custom_list_logic:
         logging.info(
             "Note: Location parameters (lat/lon/date) are ignored when using custom species list"
         )
-
-        # Create analyzer with custom species list
-        analyzer = Analyzer(custom_species_list_path=str(species_list_path))
-
-        # Create batch analyzer without location parameters
+        analyzer = Analyzer(custom_species_list_path=str(species_list_to_use))
         batch = DirectoryMultiProcessingAnalyzer(
             directory_to_analyze,
             analyzers=[analyzer],
@@ -103,11 +126,7 @@ def run_birdnet_analysis(
         logging.info(
             f"Using location-based analysis: {lat}°N, {lon}°E on {analysis_date.strftime('%Y-%m-%d')}"
         )
-
-        # Create standard analyzer
         analyzer = Analyzer()
-
-        # Create batch analyzer with location parameters
         batch = DirectoryMultiProcessingAnalyzer(
             directory_to_analyze,
             analyzers=[analyzer],
@@ -117,13 +136,11 @@ def run_birdnet_analysis(
             min_conf=min_confidence,
         )
 
-    batch.on_analyze_directory_complete = (
-        analysis_complete_wrapper  # Assign wrapper
-    )
+    batch.on_analyze_directory_complete = analysis_complete_wrapper
     logging.info("Starting batch processing of audio files...")
-    batch.process()  # Triggers analysis_complete_wrapper
+    batch.process()
     logging.info("Batch processing finished.")
 
     log_msg = f"Returning {len(detections_container)} detections from run_birdnet_analysis."
     logging.info(log_msg)
-    return detections_container  # Return the populated list
+    return detections_container

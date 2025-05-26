@@ -3,9 +3,22 @@ from birdnetlib.analyzer import Analyzer
 from birdnetlib.batch import DirectoryMultiProcessingAnalyzer
 from pathlib import Path
 
+# Define the default species list path relative to this file
+# Assumes this script is in 'functions/' and 'data_input_artsliste/' is in the parent directory.
+DEFAULT_SPECIES_LIST_PATH = (
+    Path(__file__).resolve().parent.parent
+    / "data_input_artsliste"
+    / "arter.txt"
+)
 
-def analyze_single_audio_file(audio_path, custom_species_list_path):
-    analyzer = Analyzer(custom_species_list_path=custom_species_list_path)
+
+def analyze_single_audio_file(audio_path):
+    if not DEFAULT_SPECIES_LIST_PATH.is_file():
+        print(
+            f"Error: Default species list file not found: {DEFAULT_SPECIES_LIST_PATH}"
+        )
+        return []  # Or raise error
+    analyzer = Analyzer(custom_species_list_path=str(DEFAULT_SPECIES_LIST_PATH))
     recording = Recording(
         analyzer,
         audio_path,
@@ -33,18 +46,16 @@ def _collect_detections_from_batch(recordings):
 
 
 def analyze_audio_directory_with_custom_list(
-    directory_path, custom_species_list_path, min_confidence=0.25
+    directory_path, min_confidence=0.25
 ):
     # Validate custom species list path
-    species_list_path_obj = Path(custom_species_list_path)
-    if not species_list_path_obj.is_file():  # Check if it's a file
-        # For now, let's print an error and return empty, or raise an error
+    if not DEFAULT_SPECIES_LIST_PATH.is_file():  # Check if it's a file
         print(
-            f"Error: Custom species list file not found or is not a file: {custom_species_list_path}"
+            f"Error: Default species list file not found or is not a file: {DEFAULT_SPECIES_LIST_PATH}"
         )
         return []  # Or raise FileNotFoundError
 
-    analyzer = Analyzer(custom_species_list_path=str(species_list_path_obj))
+    analyzer = Analyzer(custom_species_list_path=str(DEFAULT_SPECIES_LIST_PATH))
 
     # Container for results from the callback
     detections_container = []
