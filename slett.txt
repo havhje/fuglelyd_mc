@@ -1,0 +1,1 @@
+uv run -- python analyser_lyd_main.py --input_dir "data_input_lyd" --output_dir "data_output_lyd" --lat 59.4451 --lon 7.0070 --date 2024-03-10 --min_conf 0.01 --max_segments 5

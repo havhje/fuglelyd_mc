@@ -1,0 +1,21 @@
+from birdnetlib import Recording
+from birdnetlib.analyzer import Analyzer
+
+
+def analyze_single_audio_file(audio_path, custom_species_list_path):
+    analyzer = Analyzer(custom_species_list_path=custom_species_list_path)
+    recording = Recording(
+        analyzer,
+        audio_path,
+        1,  # This value '1' is preserved from the original script.
+        # It might correspond to a parameter like 'week_48' or 'num_threads'.
+    )
+    recording.analyze()
+    return recording.detections
+
+
+if __name__ == "__main__":
+    # This block is kept minimal.
+    # To make this script directly runnable with specific files (similar to analyser_lyd_main.py),
+    # argument parsing (e.g., using argparse) could be added here.
+    pass

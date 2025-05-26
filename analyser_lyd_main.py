@@ -9,7 +9,10 @@ import shutil
 from datetime import datetime, date
 from tqdm import tqdm
 
-from functions.birdnetlib_api import run_birdnet_analysis, on_analyze_directory_complete
+from functions.birdnetlib_api import (
+    run_birdnet_analysis,
+    on_analyze_directory_complete,
+)
 from functions.artskart_api import fetch_artskart_taxon_info_by_name
 from functions.splitter_lydfilen import split_audio_by_detection
 from functions.statistics import generate_statistics_report
@@ -34,7 +37,9 @@ def clean_output_directories(output_parent_dir_path: Path) -> None:
                 shutil.rmtree(dir_path)
                 logging.info(f"  - Cleaned directory: {dir_path}")
             except Exception as e:
-                logging.warning(f"  - Failed to clean directory {dir_path}: {e}")
+                logging.warning(
+                    f"  - Failed to clean directory {dir_path}: {e}"
+                )
 
         # Recreate the empty directory
         try:
@@ -56,7 +61,9 @@ def initialize_dataframe(detections_list: list) -> pd.DataFrame | None:
 
     # Expect 'scientific_name' from BirdNET. This will be used to fetch 'validScientificNameId'.
     if "scientific_name" not in df.columns:
-        logging.error("'scientific_name' column not found in detections. This is required for taxonomic enrichment.")
+        logging.error(
+            "'scientific_name' column not found in detections. This is required for taxonomic enrichment."
+        )
         # Optionally, return None or an empty DataFrame if this is a critical error
         return df
 
@@ -96,8 +103,13 @@ def get_norwegian_popular_name(popular_names_list: list) -> str | None:
 
 def enrich_detections_with_taxonomy(df: pd.DataFrame) -> pd.DataFrame:
     """Enriches the detections DataFrame with taxonomic information using Artskart API."""
-    if "scientific_name" not in df.columns or df["scientific_name"].isnull().all():
-        logging.warning("Skipping taxonomic enrichment: 'scientific_name' column is missing or all null.")
+    if (
+        "scientific_name" not in df.columns
+        or df["scientific_name"].isnull().all()
+    ):
+        logging.warning(
+            "Skipping taxonomic enrichment: 'scientific_name' column is missing or all null."
+        )
         return df
 
     unique_scientific_names = df["scientific_name"].dropna().unique()
@@ -105,16 +117,27 @@ def enrich_detections_with_taxonomy(df: pd.DataFrame) -> pd.DataFrame:
     # Key: scientific_name_str, Value: taxon_info_dict from Artskart
     artskart_info_cache = {}
 
-    logging.info(f"Fetching Artskart taxon info for {len(unique_scientific_names)} unique scientific names...")
-    for name in tqdm(unique_scientific_names, desc="Fetching Artskart Data", unit="name"):
+    logging.info(
+        f"Fetching Artskart taxon info for {len(unique_scientific_names)} unique scientific names..."
+    )
+    for name in tqdm(
+        unique_scientific_names, desc="Fetching Artskart Data", unit="name"
+    ):
         if name not in artskart_info_cache:
             try:
                 taxon_info = fetch_artskart_taxon_info_by_name(name)
-                artskart_info_cache[name] = taxon_info  # Cache the result, even if None
+                artskart_info_cache[name] = (
+                    taxon_info  # Cache the result, even if None
+                )
                 if not taxon_info:
-                    logging.warning(f"No Artskart data found for scientific name: {name}")
+                    logging.warning(
+                        f"No Artskart data found for scientific name: {name}"
+                    )
             except Exception as e:
-                logging.error(f"Error fetching Artskart data for '{name}': {e}", exc_info=True)
+                logging.error(
+                    f"Error fetching Artskart data for '{name}': {e}",
+                    exc_info=True,
+                )
                 artskart_info_cache[name] = None  # Cache None on error
 
     # --- Apply fetched data to the DataFrame ---
@@ -137,15 +160,21 @@ def enrich_detections_with_taxonomy(df: pd.DataFrame) -> pd.DataFrame:
 
             popular_names_species = taxon_info.get("PopularNames")
             species_nor_name = get_norwegian_popular_name(popular_names_species)
-            if not species_nor_name and sci_name:  # Added sci_name check for context
+            if (
+                not species_nor_name and sci_name
+            ):  # Added sci_name check for context
                 logging.info(
                     f"No Norwegian species name found for '{sci_name}'. PopularNames from API: {popular_names_species}"
                 )
-            species_nor_names_list.append(species_nor_name if species_nor_name else pd.NA)
+            species_nor_names_list.append(
+                species_nor_name if species_nor_name else pd.NA
+            )
 
             family_sci_names_list.append(taxon_info.get("Family", pd.NA))
             order_sci_names_list.append(taxon_info.get("Order", pd.NA))
-            redlist_status_list.append(taxon_info.get("Status", pd.NA))  # Populate Red List status
+            redlist_status_list.append(
+                taxon_info.get("Status", pd.NA)
+            )  # Populate Red List status
         else:
             valid_ids_list.append(pd.NA)
             # species_sci_name_id_list.append(pd.NA)
@@ -164,7 +193,9 @@ def enrich_detections_with_taxonomy(df: pd.DataFrame) -> pd.DataFrame:
     # --- Process Redlist_Status to keep only the first value ---
     # If Redlist_Status contains a comma, split by it and take the first part.
     df["Redlist_Status"] = df["Redlist_Status"].apply(
-        lambda x: x.split(",")[0].strip() if isinstance(x, str) and "," in x else x
+        lambda x: x.split(",")[0].strip()
+        if isinstance(x, str) and "," in x
+        else x
     )
 
     # --- Now, handle Norwegian names for Family and Order ---
@@ -174,8 +205,12 @@ def enrich_detections_with_taxonomy(df: pd.DataFrame) -> pd.DataFrame:
     unique_family_names = df["Family_ScientificName"].dropna().unique()
     family_nor_names_cache = {}  # Cache for Family SciName -> Norwegian Name
 
-    logging.info(f"Fetching Norwegian names for {len(unique_family_names)} unique families...")
-    for fam_name in tqdm(unique_family_names, desc="Fetching Family Names", unit="fam"):
+    logging.info(
+        f"Fetching Norwegian names for {len(unique_family_names)} unique families..."
+    )
+    for fam_name in tqdm(
+        unique_family_names, desc="Fetching Family Names", unit="fam"
+    ):
         if (
             fam_name not in artskart_info_cache
         ):  # Check if already fetched (e.g. if a family name was also a species name)
@@ -186,7 +221,9 @@ def enrich_detections_with_taxonomy(df: pd.DataFrame) -> pd.DataFrame:
 
         if taxon_info_fam:
             popular_names_family = taxon_info_fam.get("PopularNames")
-            norwegian_name_for_family = get_norwegian_popular_name(popular_names_family)
+            norwegian_name_for_family = get_norwegian_popular_name(
+                popular_names_family
+            )
             family_nor_names_cache[fam_name] = norwegian_name_for_family
             if not norwegian_name_for_family:
                 logging.info(
@@ -194,15 +231,23 @@ def enrich_detections_with_taxonomy(df: pd.DataFrame) -> pd.DataFrame:
                 )
         else:
             family_nor_names_cache[fam_name] = None
-            logging.warning(f"Could not fetch details for family: {fam_name} to get Norwegian name.")
+            logging.warning(
+                f"Could not fetch details for family: {fam_name} to get Norwegian name."
+            )
 
-    df["Family_NorwegianName"] = df["Family_ScientificName"].map(family_nor_names_cache).fillna(pd.NA)
+    df["Family_NorwegianName"] = (
+        df["Family_ScientificName"].map(family_nor_names_cache).fillna(pd.NA)
+    )
 
     unique_order_names = df["Order_ScientificName"].dropna().unique()
     order_nor_names_cache = {}  # Cache for Order SciName -> Norwegian Name
 
-    logging.info(f"Fetching Norwegian names for {len(unique_order_names)} unique orders...")
-    for ord_name in tqdm(unique_order_names, desc="Fetching Order Names", unit="ord"):
+    logging.info(
+        f"Fetching Norwegian names for {len(unique_order_names)} unique orders..."
+    )
+    for ord_name in tqdm(
+        unique_order_names, desc="Fetching Order Names", unit="ord"
+    ):
         if ord_name not in artskart_info_cache:
             taxon_info_ord = fetch_artskart_taxon_info_by_name(ord_name)
             artskart_info_cache[ord_name] = taxon_info_ord
@@ -211,7 +256,9 @@ def enrich_detections_with_taxonomy(df: pd.DataFrame) -> pd.DataFrame:
 
         if taxon_info_ord:
             popular_names_order = taxon_info_ord.get("PopularNames")
-            norwegian_name_for_order = get_norwegian_popular_name(popular_names_order)
+            norwegian_name_for_order = get_norwegian_popular_name(
+                popular_names_order
+            )
             order_nor_names_cache[ord_name] = norwegian_name_for_order
             if not norwegian_name_for_order:
                 logging.info(
@@ -220,7 +267,9 @@ def enrich_detections_with_taxonomy(df: pd.DataFrame) -> pd.DataFrame:
         else:
             order_nor_names_cache[ord_name] = None
 
-    df["Order_NorwegianName"] = df["Order_ScientificName"].map(order_nor_names_cache).fillna(pd.NA)
+    df["Order_NorwegianName"] = (
+        df["Order_ScientificName"].map(order_nor_names_cache).fillna(pd.NA)
+    )
 
     # Columns for Family_ScientificNameId and Order_ScientificNameId are still NA
     # as the current API call for species doesn't directly provide IDs for its family/order.
@@ -241,6 +290,7 @@ def run_full_analysis(
     birdnet_date: datetime = None,
     birdnet_min_conf: float = 0.5,
     logger_file_path: str = None,
+    custom_species_list_path: str = None,
 ):
     """
     Runs the complete bird sound analysis pipeline.
@@ -250,17 +300,20 @@ def run_full_analysis(
         output_parent_dir_path: Base directory for all outputs
         run_audio_splitting: Whether to split audio files based on detections
         max_segments_per_species: Maximum number of audio segments to save per species
-        birdnet_lon: Longitude for BirdNET analysis
-        birdnet_lat: Latitude for BirdNET analysis
-        birdnet_date: Date for seasonal adjustments in BirdNET
+        birdnet_lon: Longitude for BirdNET analysis (ignored if custom_species_list_path is provided)
+        birdnet_lat: Latitude for BirdNET analysis (ignored if custom_species_list_path is provided)
+        birdnet_date: Date for seasonal adjustments in BirdNET (ignored if custom_species_list_path is provided)
         birdnet_min_conf: Minimum confidence threshold for BirdNET detections
         logger_file_path: Optional path to logger CSV file for real timestamp analysis
+        custom_species_list_path: Optional path to custom species list file
     """
     # Clean output directories for fresh results
     clean_output_directories(output_parent_dir_path)
 
     # Construct specific output paths
-    output_csv_path = output_parent_dir_path / "interim" / "enriched_detections.csv"
+    output_csv_path = (
+        output_parent_dir_path / "interim" / "enriched_detections.csv"
+    )
     split_audio_output_dir = output_parent_dir_path / "lydfiler"
 
     # Use current date if none specified
@@ -270,18 +323,35 @@ def run_full_analysis(
     logging.info(f"Starting bird sound analysis:")
     logging.info(f"  - Input directory: {input_dir_path}")
     logging.info(f"  - Output directory: {output_parent_dir_path}")
-    logging.info(f"  - Location: {birdnet_lat}°N, {birdnet_lon}°E")
-    logging.info(f"  - Analysis date: {birdnet_date.strftime('%Y-%m-%d')}")
+
+    if custom_species_list_path:
+        logging.info(f"  - Custom species list: {custom_species_list_path}")
+        logging.info(
+            f"  - Analysis mode: Custom species list (location parameters ignored)"
+        )
+    else:
+        logging.info(f"  - Location: {birdnet_lat}°N, {birdnet_lon}°E")
+        logging.info(f"  - Analysis date: {birdnet_date.strftime('%Y-%m-%d')}")
+        logging.info(f"  - Analysis mode: Location-based")
+
     logging.info(f"  - Min confidence: {birdnet_min_conf}")
-    logging.info(f"  - Audio splitting: {'Enabled' if run_audio_splitting else 'Disabled'}")
+    logging.info(
+        f"  - Audio splitting: {'Enabled' if run_audio_splitting else 'Disabled'}"
+    )
     if run_audio_splitting:
-        logging.info(f"  - Max segments per species: {max_segments_per_species}")
+        logging.info(
+            f"  - Max segments per species: {max_segments_per_species}"
+        )
 
     # Create the callback function with the determined input path
-    prepared_callback_function = functools.partial(on_analyze_directory_complete, base_input_path=input_dir_path)
+    prepared_callback_function = functools.partial(
+        on_analyze_directory_complete, base_input_path=input_dir_path
+    )
 
     # Run BirdNET analysis
-    logging.info(f"Starting BirdNET analysis on input directory: {input_dir_path}")
+    logging.info(
+        f"Starting BirdNET analysis on input directory: {input_dir_path}"
+    )
     all_detections_list = run_birdnet_analysis(
         input_dir_path,
         prepared_callback_function,
@@ -289,6 +359,7 @@ def run_full_analysis(
         lat=birdnet_lat,
         analysis_date=birdnet_date,
         min_confidence=birdnet_min_conf,
+        custom_species_list_path=custom_species_list_path,
     )
 
     # Initialize DataFrame from detections
@@ -297,7 +368,9 @@ def run_full_analysis(
         logging.info("Exiting: No detections to process.")
         return
 
-    logging.info(f"Successfully converted {len(detections_df)} detections to DataFrame.")
+    logging.info(
+        f"Successfully converted {len(detections_df)} detections to DataFrame."
+    )
 
     # Enrich with taxonomic data
     detections_df = enrich_detections_with_taxonomy(detections_df)
@@ -312,25 +385,41 @@ def run_full_analysis(
             logging.info("Generating Joypy ridgeline plot...")
             if not detections_df.empty:
                 plot_output_dir = output_parent_dir_path / "figur"
-                joypy_output_path = plot_output_dir / "bird_detection_joypy_plot.png"
-                logging.info(f"Joypy plot will be saved to: {joypy_output_path}")
-                create_joypy_plot(df=detections_df, output_path=joypy_output_path)
-                logging.info(f"Joypy plot generated successfully: {joypy_output_path}")
+                joypy_output_path = (
+                    plot_output_dir / "bird_detection_joypy_plot.png"
+                )
+                logging.info(
+                    f"Joypy plot will be saved to: {joypy_output_path}"
+                )
+                create_joypy_plot(
+                    df=detections_df, output_path=joypy_output_path
+                )
+                logging.info(
+                    f"Joypy plot generated successfully: {joypy_output_path}"
+                )
             else:
-                logging.warning("DataFrame for Joypy plot is empty. Skipping plot generation.")
+                logging.warning(
+                    "DataFrame for Joypy plot is empty. Skipping plot generation."
+                )
         except Exception as e:
             logging.error(f"Error generating Joypy plot: {e}", exc_info=True)
 
     except Exception as e:
-        logging.error(f"Failed to save enriched detections to CSV: {e}", exc_info=True)
+        logging.error(
+            f"Failed to save enriched detections to CSV: {e}", exc_info=True
+        )
 
     # After saving the CSV, split the audio files if the flag is True
     if run_audio_splitting:
         if detections_df is not None and not detections_df.empty:
             logging.info("Proceeding to split audio files based on detections.")
-            split_audio_by_detection(detections_df, split_audio_output_dir, max_segments_per_species)
+            split_audio_by_detection(
+                detections_df, split_audio_output_dir, max_segments_per_species
+            )
         else:
-            logging.info("Skipping audio splitting as there are no detections or DataFrame is empty.")
+            logging.info(
+                "Skipping audio splitting as there are no detections or DataFrame is empty."
+            )
     else:
         logging.info("Audio splitting is disabled by configuration.")
 
@@ -351,14 +440,23 @@ if __name__ == "__main__":
 
     # Configure ffmpeg paths for pydub
     if not setup_ffmpeg():
-        logging.error("Failed to configure FFmpeg. Audio splitting may not work correctly.")
-        logging.error("Make sure ffmpeg and ffprobe are in the ffmpeg_macos_bin directory.")
+        logging.error(
+            "Failed to configure FFmpeg. Audio splitting may not work correctly."
+        )
+        logging.error(
+            "Make sure ffmpeg and ffprobe are in the ffmpeg_macos_bin directory."
+        )
 
     # Setup argument parser
-    parser = argparse.ArgumentParser(description="Analyze bird sounds in audio files using BirdNET")
+    parser = argparse.ArgumentParser(
+        description="Analyze bird sounds in audio files using BirdNET"
+    )
 
     parser.add_argument(
-        "--input_dir", type=str, required=True, help="Path to the directory containing input audio files"
+        "--input_dir",
+        type=str,
+        required=True,
+        help="Path to the directory containing input audio files",
     )
 
     parser.add_argument(
@@ -368,17 +466,39 @@ if __name__ == "__main__":
         help="Path to the base directory for outputs (interim CSV and lydfiler will be created here)",
     )
 
-    parser.add_argument("--lat", type=float, required=True, help="Latitude for BirdNET analysis (e.g., 68.59)")
-
-    parser.add_argument("--lon", type=float, required=True, help="Longitude for BirdNET analysis (e.g., 15.42)")
-
-    parser.add_argument("--date", type=str, required=True, help="Date for BirdNET analysis (YYYY-MM-DD)")
-
     parser.add_argument(
-        "--min_conf", type=float, default=0.5, help="Minimum confidence for BirdNET detections (0.0-1.0, default: 0.5)"
+        "--lat",
+        type=float,
+        required=False,
+        help="Latitude for BirdNET analysis (e.g., 68.59) - required for location-based analysis",
     )
 
-    parser.add_argument("--no_split", action="store_true", help="Disable audio splitting of detections")
+    parser.add_argument(
+        "--lon",
+        type=float,
+        required=False,
+        help="Longitude for BirdNET analysis (e.g., 15.42) - required for location-based analysis",
+    )
+
+    parser.add_argument(
+        "--date",
+        type=str,
+        required=False,
+        help="Date for BirdNET analysis (YYYY-MM-DD) - required for location-based analysis",
+    )
+
+    parser.add_argument(
+        "--min_conf",
+        type=float,
+        default=0.5,
+        help="Minimum confidence for BirdNET detections (0.0-1.0, default: 0.5)",
+    )
+
+    parser.add_argument(
+        "--no_split",
+        action="store_true",
+        help="Disable audio splitting of detections",
+    )
 
     parser.add_argument(
         "--max_segments",
@@ -395,7 +515,17 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--logger_file", type=str, default=None, help="Path to logger CSV file for real timestamp analysis (optional)"
+        "--logger_file",
+        type=str,
+        default=None,
+        help="Path to logger CSV file for real timestamp analysis (optional)",
+    )
+
+    parser.add_argument(
+        "--custom_species_list",
+        type=str,
+        default=None,
+        help="Path to custom species list file (optional)",
     )
 
     # Parse arguments
@@ -404,12 +534,27 @@ if __name__ == "__main__":
     # Set logging level based on argument
     logging.getLogger().setLevel(getattr(logging, args.log_level))
 
-    # Process and validate date
-    try:
-        analysis_date = datetime.strptime(args.date, "%Y-%m-%d")
-    except ValueError:
-        logging.error("Invalid date format. Please use YYYY-MM-DD.")
-        sys.exit(1)
+    # Validate parameter combinations
+    if args.custom_species_list:
+        # When using custom species list, location parameters are not needed
+        logging.info(
+            "Custom species list provided - location parameters will be ignored"
+        )
+        analysis_date = datetime.now()  # Use current date as default
+    else:
+        # Standard location-based analysis requires location parameters
+        if not all([args.lat, args.lon, args.date]):
+            logging.error(
+                "Location-based analysis requires --lat, --lon, and --date parameters"
+            )
+            sys.exit(1)
+
+        # Process and validate date
+        try:
+            analysis_date = datetime.strptime(args.date, "%Y-%m-%d")
+        except ValueError:
+            logging.error("Invalid date format. Please use YYYY-MM-DD.")
+            sys.exit(1)
 
     # Validate min_conf (0.0 to 1.0)
     if args.min_conf < 0.0 or args.min_conf > 1.0:
@@ -418,7 +563,9 @@ if __name__ == "__main__":
 
     # Validate max_segments
     if args.max_segments < 0:
-        logging.error("Invalid max_segments value. Must be a non-negative integer.")
+        logging.error(
+            "Invalid max_segments value. Must be a non-negative integer."
+        )
         sys.exit(1)
 
     # Determine run_audio_splitting from args
@@ -430,9 +577,10 @@ if __name__ == "__main__":
         output_parent_dir_path=Path(args.output_dir),
         run_audio_splitting=run_audio_splitting,
         max_segments_per_species=args.max_segments,
-        birdnet_lon=args.lon,
-        birdnet_lat=args.lat,
+        birdnet_lon=args.lon or 15.4244,  # Use default if None
+        birdnet_lat=args.lat or 68.5968,  # Use default if None
         birdnet_date=analysis_date,
         birdnet_min_conf=args.min_conf,
         logger_file_path=args.logger_file,
+        custom_species_list_path=args.custom_species_list,
     )
