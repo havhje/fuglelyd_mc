@@ -3,6 +3,40 @@ Created by: Håvard Hjermstad-Sollerud
 
 This tool analyzes audio recordings to detect bird species using BirdNET, enriches detections with taxonomic information from Artskart (Norwegian Biodiversity Information Centre API), and can split audio files into smaller clips based on the detections.
 
+## Table of Contents
+- [Quick Start Guide](#quick-start-guide)
+- [Features](#features)
+- [Installation Guide for Windows Users](#installation-guide-for-windows-users)
+  - [Part 1: Required Software](#part-1-required-software-done-only-once)
+  - [Part 2: Setting Up the Project Environment](#part-2-setting-up-the-project-environment-done-only-once-in-the-project-folder)
+  - [Part 3: Running the Program](#part-3-running-the-bird-analysis-program-each-time-you-want-to-use-it)
+- [Audio File Naming for Temporal Analysis](#audio-file-naming-for-temporal-analysis)
+- [Finding Your Latitude and Longitude](#finding-your-latitude-and-longitude)
+- [Command Reference](#command-reference)
+- [Real-World Examples](#real-world-examples)
+- [Output Files](#output-files)
+- [Important Notes](#important-notes)
+
+## Quick Start Guide
+
+**Already have Python 3.11 and want to jump in?**
+
+1. Download this project and extract it to `C:\BirdAnalysis`
+2. Download FFmpeg files and place them in `C:\BirdAnalysis\ffmpeg_win_bin\`
+3. Open Command Prompt, navigate to the folder, and run:
+   ```cmd
+   cd C:\BirdAnalysis
+   python -m venv tf_venv
+   tf_venv\Scripts\activate
+   python -m pip install pandas tqdm pygwalker streamlit requests pydub tensorflow ffmpeg birdnetlib pyaudio librosa "resampy>=0.4.3" "seaborn>=0.13.2" "joypy>=0.2.6" "scipy>=1.15.3"
+   ```
+4. Run your first analysis:
+   ```cmd
+   python analyser_lyd_main.py --input_dir "C:\MyAudioFiles" --output_dir "C:\Results" --lat 59.91 --lon 10.75 --date 2024-05-20
+   ```
+
+**Need detailed setup instructions?** Continue to the [Installation Guide](#installation-guide-for-windows-users) below.
+
 ## Features
 
 *   Detect bird species in audio recordings using BirdNET.
@@ -182,7 +216,7 @@ You have now completed the one-time setup!
         *   `--lon LONGITUDE`: Replace `LONGITUDE` with the longitude of the location (e.g., `10.75` for Oslo).
         *   `--date YYYY-MM-DD`: Replace `YYYY-MM-DD` with the date the recordings were made, in the format year-month-day (e.g., `2024-05-20`).
 
-    *   **See "Command-Line Interface Options and Examples" below for more detailed examples and optional arguments.**
+    *   **See "Command Reference" and "Real-World Examples" below for more detailed examples and optional arguments.**
 
     *   Press Enter to start the analysis. This can take time, depending on how many and how long your audio files are. You will see progress information in the Command Prompt window.
     *   BirdNET will download model files the first time it's run with new settings, so internet access is required then.
@@ -285,64 +319,111 @@ For the best results, you should use the accurate latitude and longitude for the
 4.  A small information box will appear at the bottom of the screen, or in the menu that pops up, showing the coordinates (two numbers, e.g., `59.912345, 10.756789`).
 5.  The first number is the latitude (`--lat`), and the second is the longitude (`--lon`).
 
-## Command-Line Interface Options and Examples
+## Command Reference
 
-### Argument Overview
+### Required Arguments
+| Argument | Description | Example |
+|----------|-------------|---------|
+| `--input_dir` | Folder containing audio files | `"C:\MyRecordings"` |
+| `--output_dir` | Where to save results | `"C:\Results"` |
 
-*   `--input_dir "PATH"`: **Required.** Path to the directory containing input audio files.
-*   `--output_dir "PATH"`: **Required.** Path to the base directory for outputs.
+### Analysis Mode (Choose One)
 
-**Analysis Mode (Choose One):**
+#### Location-Based Analysis (Default)
+| Argument | Description | Example |
+|----------|-------------|---------|
+| `--lat` | Latitude of recording location | `59.91` (Oslo) |
+| `--lon` | Longitude of recording location | `10.75` (Oslo) |
+| `--date` | Date of recordings (YYYY-MM-DD) | `2024-05-20` |
 
-1.  **Location-Based Analysis (Default):**
-    *   `--lat LATITUDE`: Required if not using a custom species list. Latitude for BirdNET analysis (e.g., `59.91`).
-    *   `--lon LONGITUDE`: Required if not using a custom species list. Longitude for BirdNET analysis (e.g., `10.75`).
-    *   `--date YYYY-MM-DD`: Required if not using a custom species list. Date for BirdNET analysis (e.g., `2024-05-20`).
+#### Custom Species List Analysis
+| Argument | Description | Example |
+|----------|-------------|---------|
+| `--use_default_species_list` | Use built-in Norwegian species list | *(no value needed)* |
+| `--custom_species_list` | Path to your own species list file | `"C:\MyLists\birds.txt"` |
 
-2.  **Custom Species List Analysis:**
-    *   `--custom_species_list "PATH_TO_LIST.txt"`: Use a specific custom species list file you provide. Ignores lat/lon/date.
-    *   `--use_default_species_list`: Use the project's built-in species list (`data_input_artsliste/arter.txt`). Ignores lat/lon/date.
-    *(Note: `--custom_species_list` and `--use_default_species_list` cannot be used at the same time.)*
+### Optional Settings
+| Argument | Default | Description | Example |
+|----------|---------|-------------|---------|
+| `--min_conf` | `0.5` | Detection confidence (0.0-1.0) | `0.75` (higher confidence) |
+| `--max_segments` | `10` | Max audio clips saved per species | `5` (fewer clips) |
+| `--no_split` | Off | Skip audio splitting (CSV only) | *(no value needed)* |
+| `--log_level` | `INFO` | Logging detail level | `DEBUG` or `WARNING` |
+| `--logger_file` | None | Path to logger CSV file | `"C:\logs\analysis.csv"` |
 
-**Other Optional Arguments:**
+### Quick Command Templates
 
-*   `--min_conf NUMBER`: Minimum confidence for detections (`0.0-1.0`, default: `0.5`).
-*   `--no_split`: Disable audio splitting of detections.
-*   `--max_segments NUMBER`: Max audio clips per species (default: `10`).
-*   `--log_level LEVEL`: Logging detail (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`; default: `INFO`).
-*   `--logger_file "PATH"`: Path to logger CSV file for real timestamp analysis (optional).
+**Basic Analysis:**
+```cmd
+python analyser_lyd_main.py --input_dir "INPUT_FOLDER" --output_dir "OUTPUT_FOLDER" --lat LATITUDE --lon LONGITUDE --date YYYY-MM-DD
+```
 
-### Examples
+**Fast Analysis (No Audio Clips):**
+```cmd
+python analyser_lyd_main.py --input_dir "INPUT_FOLDER" --output_dir "OUTPUT_FOLDER" --lat LATITUDE --lon LONGITUDE --date YYYY-MM-DD --no_split
+```
 
-Let's assume your audio files are in `C:\FieldRecordings\June2024` and output to `C:\BirdAnalysis_Results`.
+**High Confidence Analysis:**
+```cmd
+python analyser_lyd_main.py --input_dir "INPUT_FOLDER" --output_dir "OUTPUT_FOLDER" --lat LATITUDE --lon LONGITUDE --date YYYY-MM-DD --min_conf 0.75
+```
 
-1.  **Location-Based Analysis (Default Mode):**
-    Recordings from Bergen, Norway (Lat: 60.39, Lon: 5.32) on June 15th, 2024.
-    ```cmd
-    python analyser_lyd_main.py --input_dir "C:\FieldRecordings\June2024" --output_dir "C:\BirdAnalysis_Results" --lat 60.39 --lon 5.32 --date 2024-06-15
-    ```
+**Using Default Species List:**
+```cmd
+python analyser_lyd_main.py --input_dir "INPUT_FOLDER" --output_dir "OUTPUT_FOLDER" --use_default_species_list
+```
 
-2.  **Using the Project's Default Custom Species List:**
-    Analyzes based on `data_input_artsliste/arter.txt`.
-    ```cmd
-    python analyser_lyd_main.py --input_dir "C:\FieldRecordings\June2024" --output_dir "C:\BirdAnalysis_Results" --use_default_species_list
-    ```
+## Real-World Examples
 
-3.  **Using a User-Provided Custom Species List:**
-    Your custom list is at `C:\MyProject\BirdLists\target_birds.txt`.
-    ```cmd
-    python analyser_lyd_main.py --input_dir "C:\FieldRecordings\June2024" --output_dir "C:\BirdAnalysis_Results" --custom_species_list "C:\MyProject\BirdLists\target_birds.txt"
-    ```
+**Example 1: Morning Bird Survey in Oslo**
+You recorded birds in Oslo's Frogner Park on May 15, 2024:
+```cmd
+python analyser_lyd_main.py --input_dir "C:\BirdRecordings\FrognerPark" --output_dir "C:\Analysis\FrognerPark_May15" --lat 59.9139 --lon 10.7522 --date 2024-05-15
+```
+*Expected runtime: 2-5 minutes per hour of audio*
+*Output: CSV file + audio clips + activity visualization*
 
-4.  **Location-Based Analysis with Higher Confidence & Fewer Clips:**
-    ```cmd
-    python analyser_lyd_main.py --input_dir "C:\FieldRecordings\June2024" --output_dir "C:\BirdAnalysis_Results" --lat 60.39 --lon 5.32 --date 2024-06-15 --min_conf 0.75 --max_segments 3
-    ```
+**Example 2: Bergen Coastal Recording**
+Recordings from Bergen, Norway coast on June 10, 2024:
+```cmd
+python analyser_lyd_main.py --input_dir "C:\FieldRecordings\Bergen_Coast" --output_dir "C:\BirdAnalysis_Results\Bergen" --lat 60.39 --lon 5.32 --date 2024-06-10
+```
+*Expected: Seabird species detection with temporal patterns*
 
-5.  **Using Default Species List with Low Confidence & No Splitting:**
-    ```cmd
-    python analyser_lyd_main.py --input_dir "C:\FieldRecordings\June2024" --output_dir "C:\BirdAnalysis_Results" --use_default_species_list --min_conf 0.1 --no_split
-    ```
+**Example 3: Quick Species Check (No Audio Splitting)**
+Fast analysis for species identification only:
+```cmd
+python analyser_lyd_main.py --input_dir "C:\QuickCheck" --output_dir "C:\Results\Quick" --lat 59.91 --lon 10.75 --date 2024-05-15 --no_split --min_conf 0.7
+```
+*Faster processing, CSV results only, higher confidence threshold*
+
+**Example 4: High-Confidence Analysis with Fewer Clips**
+For cleaner results with only the most confident detections:
+```cmd
+python analyser_lyd_main.py --input_dir "C:\FieldRecordings\June2024" --output_dir "C:\BirdAnalysis_Results" --lat 60.39 --lon 5.32 --date 2024-06-15 --min_conf 0.75 --max_segments 3
+```
+*Only saves 3 audio clips per species, minimum 75% confidence*
+
+**Example 5: Using Project's Default Species List**
+Analyzes based on the built-in Norwegian species list:
+```cmd
+python analyser_lyd_main.py --input_dir "C:\FieldRecordings\June2024" --output_dir "C:\BirdAnalysis_Results" --use_default_species_list
+```
+*Uses predefined species list, ignores location/date parameters*
+
+**Example 6: Custom Species List for Specific Research**
+Using your own target species list:
+```cmd
+python analyser_lyd_main.py --input_dir "C:\FieldRecordings\June2024" --output_dir "C:\BirdAnalysis_Results" --custom_species_list "C:\MyProject\BirdLists\target_birds.txt"
+```
+*Only detects species from your custom list*
+
+**Example 7: Low Confidence for Rare Species Detection**
+Catching weaker signals that might be rare species:
+```cmd
+python analyser_lyd_main.py --input_dir "C:\RareSpecies\Recording" --output_dir "C:\Results\RareSpecies" --use_default_species_list --min_conf 0.1 --no_split
+```
+*Very low confidence threshold, no audio splitting for faster processing*
 
 ### Using a Custom Species List (Further Details)
 
