@@ -1,5 +1,7 @@
 from birdnetlib import Recording
 from birdnetlib.analyzer import Analyzer
+from birdnetlib.batch import DirectoryMultiProcessingAnalyzer
+from pathlib import Path
 
 
 def analyze_single_audio_file(audio_path, custom_species_list_path):
@@ -14,8 +16,64 @@ def analyze_single_audio_file(audio_path, custom_species_list_path):
     return recording.detections
 
 
-if __name__ == "__main__":
-    # This block is kept minimal.
-    # To make this script directly runnable with specific files (similar to analyser_lyd_main.py),
-    # argument parsing (e.g., using argparse) could be added here.
-    pass
+# Internal callback to collect detections from batch processing
+def _collect_detections_from_batch(recordings):
+    all_detections = []
+    for recording in recordings:
+        if recording.error:
+            # Minimal error reporting for now
+            print(
+                f"Error processing {recording.path}: {recording.error_message}"
+            )
+        else:
+            # The recording object itself contains the path, and detections
+            # are already associated with their specific file.
+            all_detections.extend(recording.detections)
+    return all_detections
+
+
+def analyze_audio_directory_with_custom_list(
+    directory_path, custom_species_list_path, min_confidence=0.25
+):
+    # Validate custom species list path
+    species_list_path_obj = Path(custom_species_list_path)
+    if not species_list_path_obj.is_file():  # Check if it's a file
+        # For now, let's print an error and return empty, or raise an error
+        print(
+            f"Error: Custom species list file not found or is not a file: {custom_species_list_path}"
+        )
+        return []  # Or raise FileNotFoundError
+
+    analyzer = Analyzer(custom_species_list_path=str(species_list_path_obj))
+
+    # Container for results from the callback
+    detections_container = []
+
+    # Wrapper for the batch analyzer's completion callback
+    def analysis_pipeline_complete_wrapper(recordings_from_birdnet):
+        processed_detections = _collect_detections_from_batch(
+            recordings_from_birdnet
+        )
+        if processed_detections:
+            detections_container.extend(processed_detections)
+
+    batch_processor = DirectoryMultiProcessingAnalyzer(
+        path=directory_path,
+        analyzers=[analyzer],  # Analyzer configured with custom species list
+        min_conf=min_confidence,
+        # num_processes can be set if needed, defaults to cpu_count()
+    )
+
+    batch_processor.on_analyze_directory_complete = (
+        analysis_pipeline_complete_wrapper
+    )
+
+    print(
+        f"Starting batch analysis on directory: {directory_path}"
+    )  # Simple print for feedback
+    batch_processor.process()  # Start analysis
+    print(
+        f"Batch analysis finished. Found {len(detections_container)} detections."
+    )  # Feedback
+
+    return detections_container

@@ -338,6 +338,59 @@ Let's assume your audio files are in a folder `C:\FieldRecordings\June2024` and 
     ```
     *(Remember to use quotes around paths if they contain spaces, like "My Documents")*
 
+### Example 3: Detailed Analysis with Audio Splitting and Higher Confidence Threshold
+```cmd
+python analyser_lyd_main.py --input_dir "D:\FieldRecordings\Spring2024" --output_dir "D:\BirdAnalysis\Spring2024_HighConf" --lat 60.123 --lon 11.456 --date 2024-04-15 --min_conf 0.7 --split_audio --max_segments 5 --log_level DEBUG
+```
+This command will:
+*   Analyze audio from `D:\FieldRecordings\Spring2024`.
+*   Save results to `D:\BirdAnalysis\Spring2024_HighConf`.
+*   Use location `60.123, 11.456` and date `2024-04-15`.
+*   Only consider detections with a confidence score of `0.7` or higher.
+*   Split the audio files, saving up to `5` segments per detected species.
+*   Provide detailed `DEBUG` level logging.
+
+### Using a Custom Species List (Advanced)
+
+For more targeted analysis, you can provide a custom list of bird species to focus on. When using a custom species list, the program will **only** search for these specific species, and the `--lat`, `--lon`, and `--date` parameters are ignored (as BirdNET's location-based filtering is bypassed).
+
+This is useful if:
+*   You are only interested in a predefined set of species.
+*   You want to analyze recordings from a location where BirdNET's standard species list might not be optimal.
+*   You are using a species list fine-tuned for a specific model or region (not covered here).
+
+**How to prepare your custom species list file:**
+
+1.  Create a plain text file (e.g., `my_species.txt`).
+2.  Each line in the file should contain **one species name** in the exact format that BirdNET expects: `Scientific name_Common English Name`.
+    *   **Example:**
+        ```
+        Bubo bubo_Eurasian Eagle-Owl
+        Erithacus rubecula_European Robin
+        Turdus merula_Common Blackbird
+        ```
+    *   You can find the correct names by looking at the output of a previous analysis (e.g., in the `common_name` and `scientific_name` columns of the `enriched_detections.csv` file, and combining them with an underscore, ensuring the common name is the English one used by BirdNET).
+    *   The `data_input_artsliste/arter.txt` file in the project is an example of such a list (though it might need updating with the correct BirdNET English common names if you modify it).
+
+**Command to run with a custom species list:**
+
+Use the `--custom_species_list` argument, providing the path to your text file.
+
+```cmd
+python analyser_lyd_main.py --input_dir "PATH_TO_YOUR_AUDIO_FOLDER" --output_dir "PATH_TO_WHERE_RESULTS_SHOULD_BE_SAVED" --custom_species_list "PATH_TO_YOUR_SPECIES_LIST_FILE.txt" [OPTIONAL_ARGUMENTS]
+```
+
+*   **Example:**
+    ```cmd
+    python analyser_lyd_main.py --input_dir "C:\Recordings\SiteX" --output_dir "C:\AnalysisResults\SiteX_CustomList" --custom_species_list "C:\MyProject\BirdLists\target_species.txt" --min_conf 0.25
+    ```
+    This command will:
+    *   Analyze audio from `C:\Recordings\SiteX`.
+    *   Save results to `C:\AnalysisResults\SiteX_CustomList`.
+    *   **Only search for species listed in `C:\MyProject\BirdLists\target_species.txt`**.
+    *   Use a minimum confidence threshold of `0.25`.
+    *   The `--lat`, `--lon`, and `--date` arguments are not needed and will be ignored if provided.
+
 ## Output Files
 
 The program will create the following in the folder you specified for `--output_dir`:
