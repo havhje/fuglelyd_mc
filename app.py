@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import os
-from datetime import datetime
+from datetime import datetime, date as date_type
 from pathlib import Path
 import subprocess
 import json
@@ -222,16 +222,31 @@ if st.button("Run Analysis", type="primary", use_container_width=True):
             if analysis_mode == "Location-based":
                 lat = latitude
                 lon = longitude
-                analysis_date = date.strftime("%Y-%m-%d")
+                # Handle date - st.date_input returns a datetime.date object
+                # Convert it to a full datetime object (with time set to midnight)
+                if isinstance(date, str):
+                    # If somehow we get a string, parse it
+                    analysis_date = datetime.strptime(date, "%Y-%m-%d")
+                else:
+                    # Convert date object to datetime object
+                    analysis_date = datetime.combine(date, datetime.min.time())
                 custom_species_list = None
             else:
                 lat = lon = analysis_date = None
-                custom_species_list = [s.strip() for s in species_list.split('\n') if s.strip()]
+                # Check if species_list is defined (it won't be if Location-based mode was selected)
+                if 'species_list' in locals():
+                    custom_species_list = [s.strip() for s in species_list.split('\n') if s.strip()]
+                else:
+                    custom_species_list = None
+            
+            # Create callback wrapper that includes base_input_path
+            def analysis_callback(recordings):
+                return on_analyze_directory_complete(recordings, input_dir)
             
             # Run BirdNET analysis
             all_detections = run_birdnet_analysis(
                 input_dir,
-                on_analyze_directory_complete,
+                analysis_callback,
                 lon=lon if analysis_mode == "Location-based" else None,
                 lat=lat if analysis_mode == "Location-based" else None,
                 analysis_date=analysis_date if analysis_mode == "Location-based" else None,
@@ -255,19 +270,41 @@ if st.button("Run Analysis", type="primary", use_container_width=True):
             unique_species = detections_df['common_name'].unique()
             
             for species in unique_species:
-                taxon_info = fetch_artskart_taxon_info_by_name(species)
+                # Get scientific name for this species
+                scientific_name = detections_df[detections_df['common_name'] == species]['scientific_name'].iloc[0]
+                taxon_info = fetch_artskart_taxon_info_by_name(scientific_name)
                 species_detections = detections_df[detections_df['common_name'] == species].copy()
                 
                 if taxon_info:
-                    species_detections['norsk_navn'] = taxon_info.get('norwegianName', '')
-                    species_detections['family'] = taxon_info.get('family', '')
-                    species_detections['order'] = taxon_info.get('order', '')
-                    species_detections['redlist_status'] = taxon_info.get('redlistStatus', '')
+                    # Extract Norwegian name from PopularNames list
+                    popular_names = taxon_info.get('PopularNames', [])
+                    norwegian_name = ''
+                    for name_obj in popular_names:
+                        if isinstance(name_obj, dict) and name_obj.get('language') in ['nb-NO', 'nn-NO']:
+                            norwegian_name = name_obj.get('Name', '')
+                            break
+                    
+                    # Use PrefferedPopularname as fallback
+                    if not norwegian_name:
+                        norwegian_name = taxon_info.get('PrefferedPopularname', '')
+                    
+                    species_detections['norsk_navn'] = norwegian_name
+                    species_detections['Species_NorwegianName'] = norwegian_name  # For compatibility
+                    species_detections['family'] = taxon_info.get('Family', '')
+                    species_detections['Family_ScientificName'] = taxon_info.get('Family', '')  # For compatibility
+                    species_detections['order'] = taxon_info.get('Order', '')
+                    species_detections['Order_ScientificName'] = taxon_info.get('Order', '')  # For compatibility
+                    species_detections['redlist_status'] = taxon_info.get('Status', '')
+                    species_detections['Redlist_Status'] = taxon_info.get('Status', '')  # For compatibility
                 else:
                     species_detections['norsk_navn'] = ''
+                    species_detections['Species_NorwegianName'] = ''  # For compatibility
                     species_detections['family'] = ''
+                    species_detections['Family_ScientificName'] = ''  # For compatibility
                     species_detections['order'] = ''
+                    species_detections['Order_ScientificName'] = ''  # For compatibility
                     species_detections['redlist_status'] = ''
+                    species_detections['Redlist_Status'] = ''  # For compatibility
                     
                 enriched_detections.append(species_detections)
             
@@ -284,13 +321,12 @@ if st.button("Run Analysis", type="primary", use_container_width=True):
             audio_output_dir = os.path.join(output_dir, "lydfiler")
             os.makedirs(audio_output_dir, exist_ok=True)
             
-            # Split audio for each detection
-            for _, detection in enriched_df.iterrows():
-                split_audio_by_detection(
-                    detection,
-                    audio_output_dir,
-                    overwrite=True
-                )
+            # Split audio files based on detections
+            split_audio_by_detection(
+                enriched_df,
+                Path(audio_output_dir),
+                max_segments_per_species=10
+            )
             
             # Step 4: Generate statistics
             status_text.text("Generating statistics...")
@@ -308,7 +344,7 @@ if st.button("Run Analysis", type="primary", use_container_width=True):
             os.makedirs(figur_dir, exist_ok=True)
             
             # Generate joyplot
-            create_joypy_plot(enriched_df, figur_dir)
+            create_joypy_plot(enriched_df, Path(figur_dir))
             
             # Complete
             progress_bar.progress(100)
