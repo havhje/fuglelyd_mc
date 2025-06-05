@@ -53,6 +53,10 @@ python analyser_lyd_main.py --input_dir "path/to/audio" --output_dir "path/to/re
 python analyser_lyd_main.py --input_dir "path/to/audio" --output_dir "path/to/results" --lat 59.91 --lon 10.75 --date 2024-05-20 --no_split
 ```
 
+## Development Best Practices
+
+- Always UV to add dependencies and manage virtual environments
+
 ## Architecture
 
 ### Core Components
@@ -141,3 +145,4 @@ The system automatically detects platform-specific FFmpeg binaries:
 - Integration tests for analysis workflow
 - Sample data generation for testing
 - Test data isolation in `tests/test_data/`
+```
