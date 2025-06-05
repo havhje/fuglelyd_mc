@@ -5,6 +5,7 @@ from datetime import datetime, date as date_type
 from pathlib import Path
 import subprocess
 import json
+import matplotlib.pyplot as plt
 
 # Import analysis functions
 from functions.birdnetlib_api import run_birdnet_analysis, on_analyze_directory_complete
@@ -371,33 +372,111 @@ if st.session_state.analysis_complete and st.session_state.results_df is not Non
     df = st.session_state.results_df
     
     # Summary statistics
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
         st.metric("Total Detections", len(df))
     with col2:
-        st.metric("Species Detected", df['common_name'].nunique())
+        st.metric("Species Detected", df['Species_NorwegianName'].nunique())
+    with col3:
+        high_conf = len(df[df['confidence'] > 0.8])
+        st.metric("High Confidence (>0.8)", f"{high_conf} ({round(high_conf/len(df)*100, 1)}%)")
     
-    # Aggregate results by species
-    species_summary = df.groupby(['common_name', 'norsk_navn']).agg({
-        'confidence': ['count', 'mean']
+    # Aggregate results by species with all required columns
+    species_summary = df.groupby([
+        'Species_NorwegianName', 
+        'common_name',
+        'scientific_name',
+        'Family_ScientificName',
+        'Redlist_Status'
+    ]).agg({
+        'confidence': ['count', 'mean', 'max']
     }).round(3)
-    species_summary.columns = ['Detection Count', 'Average Confidence']
+    
+    # Flatten column names
+    species_summary.columns = ['Detection Count', 'Avg Confidence', 'Max Confidence']
     species_summary = species_summary.reset_index()
-    species_summary = species_summary.sort_values('Detection Count', ascending=False)
+    
+    # Rename columns for display
+    species_summary = species_summary.rename(columns={
+        'Species_NorwegianName': 'Norsk navn',
+        'scientific_name': 'Vitenskapelig navn',
+        'Family_ScientificName': 'Familie',
+        'Redlist_Status': 'Rødlistestatus',
+        'Detection Count': 'Antall observasjoner'
+    })
+    
+    # Select and order columns as requested
+    display_columns = [
+        'Norsk navn',
+        'Vitenskapelig navn', 
+        'Familie',
+        'Antall observasjoner',
+        'Rødlistestatus'
+    ]
+    
+    species_summary = species_summary[display_columns]
+    species_summary = species_summary.sort_values('Antall observasjoner', ascending=False)
     
     # Display table
-    st.subheader("Species Summary")
+    st.subheader("Artssammendrag")
     st.dataframe(
         species_summary,
         use_container_width=True,
-        hide_index=True
+        hide_index=True,
+        column_config={
+            "Antall observasjoner": st.column_config.NumberColumn(
+                "Antall observasjoner",
+                format="%d"
+            ),
+            "Rødlistestatus": st.column_config.TextColumn(
+                "Rødlistestatus",
+                help="CR=Kritisk truet, EN=Sterkt truet, VU=Sårbar, NT=Nær truet, LC=Livskraftig"
+            )
+        }
     )
     
-    # Download button
-    csv = species_summary.to_csv(index=False)
-    st.download_button(
-        label="Download Results (CSV)",
-        data=csv,
-        file_name=f"bird_analysis_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-        mime="text/csv"
-    )
+    # Show redlist status summary
+    if 'Redlist_Status' in df.columns:
+        st.subheader("Rødlistestatus oversikt")
+        redlist_counts = df.groupby('Redlist_Status')['Species_NorwegianName'].agg(['count', 'nunique']).reset_index()
+        redlist_counts.columns = ['Status', 'Antall deteksjoner', 'Antall arter']
+        redlist_counts = redlist_counts.sort_values('Antall deteksjoner', ascending=False)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.dataframe(redlist_counts, use_container_width=True, hide_index=True)
+        
+        with col2:
+            # Create a simple bar chart of species by status
+            if len(redlist_counts) > 0:
+                import matplotlib.pyplot as plt
+                fig, ax = plt.subplots(figsize=(6, 4))
+                ax.bar(redlist_counts['Status'], redlist_counts['Antall arter'])
+                ax.set_xlabel('Rødlistestatus')
+                ax.set_ylabel('Antall arter')
+                ax.set_title('Arter per rødlistekategori')
+                plt.xticks(rotation=45)
+                plt.tight_layout()
+                st.pyplot(fig)
+    
+    # Download buttons
+    col1, col2 = st.columns(2)
+    with col1:
+        # Summary CSV
+        summary_csv = species_summary.to_csv(index=False)
+        st.download_button(
+            label="Last ned artssammendrag (CSV)",
+            data=summary_csv,
+            file_name=f"artssammendrag_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            mime="text/csv"
+        )
+    
+    with col2:
+        # Full results CSV
+        full_csv = df.to_csv(index=False)
+        st.download_button(
+            label="Last ned alle deteksjoner (CSV)",
+            data=full_csv,
+            file_name=f"alle_deteksjoner_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            mime="text/csv"
+        )
