@@ -8,7 +8,9 @@ dependencies = [
     "pandas",
     "tqdm",
     "pygwalker",
-    "streamlit",
+    "streamlit>=1.28.0",
+    "streamlit-folium>=0.15.0",
+    "streamlit-aggrid>=0.3.4",
     "requests",
     "pydub",
     "tensorflow",
@@ -20,4 +22,5 @@ dependencies = [
     "seaborn>=0.13.2",
     "joypy>=0.2.6",
     "scipy>=1.15.3",
+    "matplotlib",
 ]

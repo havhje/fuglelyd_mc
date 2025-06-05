@@ -3,6 +3,8 @@ from birdnetlib.batch import DirectoryMultiProcessingAnalyzer
 from datetime import datetime
 from pathlib import Path
 import logging
+import os
+from typing import Callable, Optional
 
 # Define the default custom species list path relative to this file
 # Assumes this script is in 'functions/' and 'data_input_artsliste/' is in the parent directory.
@@ -40,6 +42,7 @@ def run_birdnet_analysis(
     analysis_date=None,
     min_confidence=0.01,
     custom_species_list_path: str | bool | None = None,
+    progress_callback=None,
 ):
     """
     Run BirdNET analysis on audio files in the specified directory.
@@ -52,6 +55,7 @@ def run_birdnet_analysis(
         analysis_date: Date of recording for seasonal adjustments (datetime object, ignored if custom_species_list_path is provided)
         min_confidence: Minimum confidence threshold for detections (0.0-1.0)
         custom_species_list_path: Path to custom species list file (optional)
+        progress_callback: Optional callback function for progress updates (progress, filename) -> bool
 
     Returns:
         List of detection dictionaries
@@ -137,6 +141,43 @@ def run_birdnet_analysis(
         )
 
     batch.on_analyze_directory_complete = analysis_complete_wrapper
+    
+    # Count total files for progress tracking
+    if progress_callback:
+        audio_extensions = {'.wav', '.mp3', '.flac', '.ogg', '.m4a', '.aac', '.opus'}
+        total_files = 0
+        for root, _, files in os.walk(directory_to_analyze):
+            for file in files:
+                if Path(file).suffix.lower() in audio_extensions:
+                    total_files += 1
+        
+        if total_files > 0:
+            processed_files = 0
+            
+            # Create a wrapper for file processing callback
+            original_on_analyze_file_complete = getattr(batch, 'on_analyze_file_complete', None)
+            
+            def file_complete_wrapper(recording):
+                nonlocal processed_files
+                processed_files += 1
+                
+                # Call progress callback
+                progress = processed_files / total_files
+                filename = Path(recording.path).name if recording else ""
+                
+                # If callback returns False, it means cancellation was requested
+                should_continue = progress_callback(progress, filename)
+                if not should_continue:
+                    logging.info("Analysis cancelled by user")
+                    # Note: DirectoryMultiProcessingAnalyzer doesn't have a clean cancel method
+                    # This is a limitation we'll need to work around in the UI
+                
+                # Call original callback if it exists
+                if original_on_analyze_file_complete:
+                    original_on_analyze_file_complete(recording)
+            
+            batch.on_analyze_file_complete = file_complete_wrapper
+    
     logging.info("Starting batch processing of audio files...")
     batch.process()
     logging.info("Batch processing finished.")

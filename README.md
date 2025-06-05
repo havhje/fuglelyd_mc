@@ -3,9 +3,12 @@ Created by: Håvard Hjermstad-Sollerud
 
 This tool analyzes audio recordings to detect bird species using BirdNET, enriches detections with taxonomic information from Artskart (Norwegian Biodiversity Information Centre API), and can split audio files into smaller clips based on the detections.
 
+**New!** This tool now includes a user-friendly web interface powered by Streamlit, in addition to the command-line interface.
+
 ## Table of Contents
 - [Quick Start Guide](#quick-start-guide)
 - [Features](#features)
+- [Web Interface (Streamlit)](#web-interface-streamlit)
 - [Installation Guide for Windows Users](#installation-guide-for-windows-users)
   - [Part 1: Required Software](#part-1-required-software-done-only-once)
   - [Part 2: Setting Up the Project Environment](#part-2-setting-up-the-project-environment-done-only-once-in-the-project-folder)
@@ -28,9 +31,17 @@ This tool analyzes audio recordings to detect bird species using BirdNET, enrich
    cd C:\BirdAnalysis
    python -m venv tf_venv
    tf_venv\Scripts\activate
-   python -m pip install pandas tqdm pygwalker streamlit requests pydub tensorflow ffmpeg birdnetlib pyaudio librosa "resampy>=0.4.3" "seaborn>=0.13.2" "joypy>=0.2.6" "scipy>=1.15.3"
+   python -m pip install pandas tqdm pygwalker streamlit>=1.28.0 streamlit-folium>=0.15.0 streamlit-aggrid>=0.3.4 requests pydub tensorflow ffmpeg birdnetlib pyaudio librosa "resampy>=0.4.3" "seaborn>=0.13.2" "joypy>=0.2.6" "scipy>=1.15.3" matplotlib
    ```
-4. Run your first analysis:
+4. Run the analysis:
+   
+   **Option A - Web Interface (Recommended):**
+   ```cmd
+   streamlit run app.py
+   ```
+   Then open your browser to http://localhost:8501
+   
+   **Option B - Command Line:**
    ```cmd
    python analyser_lyd_main.py --input_dir "C:\MyAudioFiles" --output_dir "C:\Results" --lat 59.91 --lon 10.75 --date 2024-05-20
    ```
@@ -43,6 +54,62 @@ This tool analyzes audio recordings to detect bird species using BirdNET, enrich
 *   Fetch taxonomic data (Norwegian common names, scientific names, family, order, red list status) from Artskart.
 *   Save enriched detection data to a CSV file (a spreadsheet-like format).
 *   Split audio files into segments by species and save them into dedicated folders.
+*   **NEW: User-friendly web interface with real-time progress tracking**
+*   **NEW: Interactive results viewer with filtering and export options**
+*   **NEW: In-browser audio playback for detected bird sounds**
+*   **NEW: Visual species list editor and settings management**
+
+## Web Interface (Streamlit)
+
+The tool now includes a modern web interface that makes it easy to run analyses without using the command line.
+
+### Starting the Web Interface
+
+After installation, run:
+```cmd
+streamlit run app.py
+```
+
+Your browser will open automatically to `http://localhost:8501`
+
+### Web Interface Features
+
+#### 🎵 Analysis Page
+- Browse and select audio file directories
+- Choose output location for results
+- Configure analysis mode:
+  - Location-based (using coordinates and date)
+  - Species list (using default or custom lists)
+- Adjust detection parameters with sliders
+- Monitor real-time progress
+- Cancel analysis if needed
+
+#### 📊 Results Page
+- View all detections in an interactive table
+- Filter by species, confidence, Norwegian names
+- See summary statistics and species counts
+- Export filtered or full results as CSV
+- View temporal activity visualizations
+
+#### 🔊 Audio Explorer
+- Browse detected bird sounds by species
+- Play audio clips directly in your browser
+- Filter clips by confidence level
+- View detection metadata
+- Gallery or list view modes
+
+#### ⚙️ Settings Page
+- Set default directories
+- Edit species lists with built-in editor
+- Import/export species lists
+- Configure analysis defaults
+- Verify FFmpeg installation
+
+#### ℹ️ About Page
+- Comprehensive documentation
+- Usage guides and tips
+- Troubleshooting help
+- API attributions
 
 ## Installation Guide for Windows Users
 
@@ -172,7 +239,7 @@ Each time you start a new Python project, it's good practice to create a "virtua
 6.  **Install required Python packages:**
     *   Now, we'll install all the additional libraries (software packages) that the bird analysis program needs. Copy and paste (or type carefully) the following long command into Command Prompt:
         ```cmd
-        python -m pip install pandas tqdm pygwalker streamlit requests pydub tensorflow ffmpeg birdnetlib pyaudio librosa "resampy>=0.4.3" "seaborn>=0.13.2" "joypy>=0.2.6" "scipy>=1.15.3"
+        python -m pip install pandas tqdm pygwalker streamlit>=1.28.0 streamlit-folium>=0.15.0 streamlit-aggrid>=0.3.4 requests pydub tensorflow ffmpeg birdnetlib pyaudio librosa "resampy>=0.4.3" "seaborn>=0.13.2" "joypy>=0.2.6" "scipy>=1.15.3" matplotlib
         ```
     *   Press Enter. This might take several minutes, as many files are downloaded and installed. You'll see a lot of text scrolling on the screen. Wait until it's finished and you see the `(tf_venv)` prompt again.
         *   *If you get error messages here, double-check that you installed Python 3.11 (not a different version) and that you activated the virtual environment `(tf_venv)` correctly.*
@@ -180,6 +247,49 @@ Each time you start a new Python project, it's good practice to create a "virtua
 You have now completed the one-time setup!
 
 ### Part 3: Running the Bird Analysis Program (Each Time You Want to Use It)
+
+You can run the program in two ways: using the new web interface (recommended for beginners) or the command line interface.
+
+#### Option A: Using the Web Interface (Recommended)
+
+1.  **Open Command Prompt:**
+    *   Press **Windows key + R**, type `cmd`, press Enter.
+
+2.  **Navigate to your project folder:**
+    *   (Remember to replace `C:\BirdAnalysis` with the actual path to your project folder)
+        ```cmd
+        cd C:\BirdAnalysis
+        ```
+    *   Press Enter.
+
+3.  **Activate the virtual environment:**
+    *   (This needs to be done once per Command Prompt session)
+        ```cmd
+        tf_venv\Scripts\activate
+        ```
+    *   Press Enter. You should see `(tf_venv)` at the start of the line.
+
+4.  **Start the web interface:**
+    ```cmd
+    streamlit run app.py
+    ```
+    *   Your browser will automatically open to `http://localhost:8501`
+    *   If it doesn't open automatically, manually open your browser and go to that address
+
+5.  **Use the web interface:**
+    *   Click on **🎵 Analysis** in the sidebar
+    *   Browse and select your audio files directory
+    *   Choose where to save results
+    *   Configure your analysis settings
+    *   Click **🚀 Start Analysis** and watch the progress
+    *   When complete, explore results in the other pages
+
+6.  **When finished:**
+    *   Close the browser tab
+    *   In Command Prompt, press **Ctrl+C** to stop the server
+    *   Close Command Prompt or type `deactivate` to exit the virtual environment
+
+#### Option B: Using the Command Line Interface
 
 1.  **Make sure you have audio files ready:**
     *   Place the audio files you want to analyze (e.g., `.wav` or `.mp3` files) in a dedicated folder. For example, create a folder `C:\MyAudioRecordings`.
